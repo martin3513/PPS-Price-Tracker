@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>조달청 데이터 통합 관리기 (가격 낮은순)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f3f4f6; }
+        .container { max-width: 98%; margin: 0 auto; padding: 20px; }
+        
+        textarea { width: 100%; height: 120px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 13px; }
+        select, input[type="date"] { padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+
+        /* 테이블 스타일 */
+        .table-wrapper { 
+            overflow-x: auto; 
+            max-height: 700px; 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
+            border-radius: 8px; 
+            border: 1px solid #e5e7eb;
+            position: relative;
+        }
+        
+        table { border-collapse: separate; border-spacing: 0; background: white; font-size: 12px; white-space: nowrap; }
+        th, td { border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; padding: 8px 10px; vertical-align: middle; }
+        
+        /* 헤더 고정 (Sticky) */
+        thead th { position: sticky; top: 0; z-index: 30; background-color: #f3f4f6; border-top: 1px solid #e5e7eb; height: 40px; }
+
+        /* 왼쪽 고정 컬럼 */
+        th:nth-child(1), td:nth-child(1) { position: sticky; left: 0; z-index: 20; background-color: #f9fafb; border-right: 2px solid #e5e7eb; text-align: center;}
+        th:nth-child(2), td:nth-child(2) { position: sticky; left: 50px; z-index: 20; background-color: #f9fafb; border-right: 2px solid #e5e7eb; }
+        th:nth-child(3), td:nth-child(3) { position: sticky; left: 180px; z-index: 20; background-color: #f9fafb; border-right: 2px solid #dedede; }
+
+        /* 교차점 z-index 처리 */
+        thead th:nth-child(1), thead th:nth-child(2), thead th:nth-child(3) { z-index: 40; background-color: #e5e7eb; }
+
+        /* 버튼 및 강조 */
+        .btn { padding: 8px 14px; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; border: none; font-size: 13px; transition: 0.2s; }
+        .btn-blue { background-color: #2563eb; }
+        .btn-green { background-color: #16a34a; }
+        .btn-red { background-color: #ef4444; } /* 리셋 버튼용 */
+        .btn:hover { opacity: 0.9; }
+
+        .bg-red-row { background-color: #fef2f2 !important; }
+        .bg-green-row { background-color: #f0fdf4 !important; }
+        .sorted-header { background-color: #dbeafe !important; color: #1e40af; border-bottom: 2px solid #2563eb; }
+
+        .filter-box { background-color: #eff6ff; border: 1px solid #dbeafe; padding: 10px; border-radius: 6px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 class="text-2xl font-bold mb-4 text-gray-800">📊 조달청 데이터 통합 관리기</h1>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200">
+            <h3 class="font-bold text-gray-700 mb-2">📂 1. 이전 히스토리 파일 (CSV)</h3>
+            <input type="file" id="prevFile" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+            <div id="fileStatus" class="mt-2 text-xs text-blue-600 font-bold h-4"></div>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200">
+            <h3 class="font-bold text-gray-700 mb-2">📝 2. 오늘 데이터 입력</h3>
+            <div class="flex gap-2 mb-2">
+                <select id="categorySelect" class="flex-1">
+                    <option value="인터랙티브화이트보드">인터랙티브화이트보드</option>
+                    <option value="데스크톱컴퓨터">데스크톱컴퓨터</option>
+                    <option value="모니터">모니터</option>
+                    <option value="노트북">노트북</option>
+                    <option value="기타">기타</option>
+                </select>
+                <input type="date" id="todayDate" class="flex-1" onchange="renderTable()">
+            </div>
+            <textarea id="rawData" placeholder="조달청 목록 텍스트를 붙여넣으세요"></textarea>
+            <div class="flex gap-2 mt-2">
+                <button onclick="processData()" class="w-full btn btn-blue">데이터 분석 및 병합</button>
+                <button onclick="resetData()" class="w-1/4 btn btn-red">🔄 리셋</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="resultArea" class="bg-white p-4 rounded-lg shadow hidden">
+        
+        <div class="flex flex-wrap justify-between items-end mb-2">
+            <h2 class="text-xl font-bold text-gray-800">분석 결과 (<span id="count">0</span>건)</h2>
+            <button onclick="downloadCSV()" class="btn btn-green">💾 엑셀(CSV) 다운로드</button>
+        </div>
+
+        <div class="filter-box">
+            <div>
+                <label class="font-bold text-gray-700 mr-2">🏢 업체명:</label>
+                <select id="companyFilter" onchange="renderTable()" style="width: 150px;">
+                    <option value="">전체 업체</option>
+                </select>
+            </div>
+            <div>
+                <label class="font-bold text-gray-700 mr-2">📈 상태:</label>
+                <select id="statusFilter" onchange="renderTable()" style="width: 120px;">
+                    <option value="">전체 보기</option>
+                    <option value="UP">인상 (🔺)</option>
+                    <option value="DOWN">인하 (🔻)</option>
+                    <option value="NEW">신규 (🆕)</option>
+                    <option value="SAME">변동없음</option>
+                </select>
+            </div>
+            <div class="text-xs text-blue-800 ml-auto font-bold bg-blue-100 px-3 py-1 rounded border border-blue-200">
+                정렬: <span id="sortLabel">오늘 날짜</span> 가격 낮은순 ▲
+            </div>
+        </div>
+
+        <div class="table-wrapper">
+            <table id="resultTable">
+                <thead></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('todayDate').valueAsDate = new Date();
+
+    let mergedData = [];       
+    let dateColumns = [];      
+    const fixedCols = ['상태', '업체명', '식별번호', '규격', '계약종료일', '변동액', '비고'];
+
+    // 1. CSV 파일 읽기
+    document.getElementById('prevFile').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                if(results.data.length === 0) return;
+                const headers = results.meta.fields;
+                dateColumns = headers.filter(h => !fixedCols.includes(h)).sort();
+                mergedData = results.data;
+                document.getElementById('fileStatus').innerText = `✅ 기존 데이터 ${mergedData.length}건 로드됨`;
+                updateFilters();
+                renderTable();
+            }
+        });
+    });
+
+    // 2. 데이터 처리
+    function processData() {
+        const rawText = document.getElementById('rawData').value;
+        const todayStr = document.getElementById('todayDate').value;
+        
+        if (!dateColumns.includes(todayStr) && rawText.trim()) {
+            dateColumns.push(todayStr);
+            dateColumns.sort();
+        }
+
+        const todayMap = new Map();
+        if (rawText.trim()) {
+            // **[데이터 분리 패턴]**
+            // 1. 점선(----)
+            // 2. "대" 라는 단위가 줄바꿈과 함께 있을 때 (예: \n0\n대\n 또는 그냥 \n대\n)
+            // 3. "추가선택" 문구
+            const blocks = rawText.split(/추가선택\(.*?\)|-{10,}|\n\s*\d*\s*\n\s*대\s*(?:\n|$)/);
+            
+            blocks.forEach(block => {
+                const item = parseBlock(block);
+                if (item.id && item.price) {
+                    todayMap.set(item.id, item);
+                }
+            });
+        }
+
+        let finalMap = new Map();
+        mergedData.forEach(row => { if(row['식별번호']) finalMap.set(row['식별번호'], row); });
+
+        todayMap.forEach((item, id) => {
+            if (finalMap.has(id)) {
+                let row = finalMap.get(id);
+                row[todayStr] = item.price;
+                row['계약종료일'] = item.endDate;
+                if(item.company) row['업체명'] = item.company; 
+                // 규격이 더 긴 정보로 들어오면 업데이트
+                if(item.spec.length > (row['규격']||"").length) row['규격'] = item.spec;
+            } else {
+                let newRow = {
+                    '업체명': item.company,
+                    '식별번호': item.id,
+                    '규격': item.spec,
+                    '계약종료일': item.endDate,
+                    [todayStr]: item.price
+                };
+                finalMap.set(id, newRow);
+            }
+        });
+
+        mergedData = Array.from(finalMap.values());
+        calculateStatus(todayStr);
+        updateFilters();
+        renderTable();
+    }
+
+    // [핵심] 파싱 로직
+    function parseBlock(block) {
+        const lines = block.split('\n').map(l => l.trim()).filter(l => l);
+        let item = { company: '', id: '', spec: '', price: 0, endDate: '' };
+        if (lines.length < 3) return item;
+
+        // 1. 업체명: 품목명(코드) 다음 줄에 주로 위치
+        const catIdx = lines.findIndex(l => /^[가-힣a-zA-Z]+\(\d+\)$/.test(l));
+        if (catIdx !== -1 && lines[catIdx + 1]) {
+            item.company = lines[catIdx + 1];
+        } else {
+            // 패턴이 없으면 키워드로 검색
+            const comIdx = lines.findIndex(l => l.includes("주식회사") || l.includes("(주)") || l.includes("컴트리") || l.includes("컴버스테크"));
+            if(comIdx!==-1) item.company = lines[comIdx];
+        }
+
+        // 2. 식별번호
+        const idIdx = lines.indexOf("식별번호");
+        if(idIdx !== -1) item.id = lines[idIdx+1];
+
+        // 3. 규격: 품목명이나 콤마가 포함된 긴 줄
+        // 우선순위: 카테고리명으로 시작하는 줄 > 콤마가 많은 줄
+        const categoryVal = document.getElementById('categorySelect').value || "인터랙티브";
+        let specLine = lines.find(l => l.startsWith(categoryVal + ","));
+        if (!specLine) {
+            specLine = lines.find(l => (l.includes(",") && l.length > 20));
+        }
+        item.spec = specLine || '';
+
+        // 4. 가격
+        const priceLine = lines.find(l => /^[0-9,]+원$/.test(l));
+        if (priceLine) item.price = parseInt(priceLine.replace(/[^0-9]/g, ''));
+
+        // 5. 종료일
+        const dateLine = lines.find(l => /20\d{2}\.\d{2}\.\d{2}/.test(l) && !l.includes("납품기한"));
+        if(dateLine) item.endDate = dateLine;
+
+        return item;
+    }
+
+    function calculateStatus(currentDate) {
+        const curIdx = dateColumns.indexOf(currentDate);
+        const prevDate = curIdx > 0 ? dateColumns[curIdx - 1] : null;
+
+        mergedData.forEach(row => {
+            const curP = parseInt(row[currentDate]) || 0;
+            if (curP === 0) {
+                row['상태'] = 'SAME'; row['변동액'] = 0; return; 
+            }
+            const prevP = prevDate ? (parseInt(row[prevDate]) || 0) : 0;
+            if (prevP === 0) {
+                row['상태'] = 'NEW'; row['변동액'] = 0;
+            } else {
+                const diff = curP - prevP;
+                row['변동액'] = diff;
+                if (diff > 0) row['상태'] = 'UP';
+                else if (diff < 0) row['상태'] = 'DOWN';
+                else row['상태'] = 'SAME';
+            }
+        });
+    }
+
+    // 리셋 기능
+    function resetData() {
+        if(!confirm("모든 데이터를 초기화하시겠습니까? (복구 불가)")) return;
+        
+        mergedData = [];
+        dateColumns = [];
+        document.getElementById('rawData').value = "";
+        document.getElementById('prevFile').value = ""; // 파일 선택 초기화
+        document.getElementById('fileStatus').innerText = "";
+        document.getElementById('resultArea').classList.add('hidden');
+        document.getElementById('companyFilter').innerHTML = '<option value="">전체 업체</option>';
+        alert("초기화되었습니다.");
+    }
+
+    function updateFilters() {
+        const companySet = new Set();
+        mergedData.forEach(row => { if(row['업체명']) companySet.add(row['업체명']); });
+        const sortedComp = Array.from(companySet).sort();
+
+        const sel = document.getElementById("companyFilter");
+        const currentVal = sel.value;
+        sel.innerHTML = '<option value="">전체 업체</option>';
+        sortedComp.forEach(c => {
+            const op = document.createElement("option");
+            op.value = c; op.innerText = c;
+            sel.appendChild(op);
+        });
+        sel.value = currentVal; 
+    }
+
+    function renderTable() {
+        const compVal = document.getElementById("companyFilter").value;
+        const statVal = document.getElementById("statusFilter").value;
+        const todayKey = document.getElementById("todayDate").value;
+
+        document.getElementById("sortLabel").innerText = todayKey;
+
+        // 필터링
+        const filtered = mergedData.filter(row => {
+            const matchComp = (compVal === "") || (row['업체명'] === compVal);
+            const matchStat = (statVal === "") || (row['상태'] === statVal);
+            return matchComp && matchStat;
+        });
+
+        // **정렬 로직 수정됨: 오름차순 (가격 낮은순)**
+        filtered.sort((a, b) => {
+            const valA = a[todayKey];
+            const valB = b[todayKey];
+            const priceA = valA ? parseInt(String(valA).replace(/,/g, '')) : 0;
+            const priceB = valB ? parseInt(String(valB).replace(/,/g, '')) : 0;
+            
+            // 0원인 경우(데이터 없음) 맨 뒤로 보낼지 여부는 선택사항이나, 여기선 일반 정렬
+            if (priceA !== priceB) return priceA - priceB; // Low -> High (오름차순)
+            return (a['업체명']||"").localeCompare(b['업체명']||"");
+        });
+
+        // 테이블 그리기
+        const thead = document.querySelector("#resultTable thead");
+        let thHTML = `<tr>
+            <th style="width:50px;">상태</th>
+            <th style="width:130px;">업체명</th>
+            <th style="width:80px;">식별번호</th>
+            <th style="min-width:200px;">규격</th>`;
+        
+        dateColumns.forEach(date => {
+            const isSortKey = (date === todayKey);
+            const classAttr = isSortKey ? 'class="sorted-header"' : '';
+            const icon = isSortKey ? ' ▲' : ''; // 오름차순 아이콘
+            thHTML += `<th ${classAttr} style="width:90px; text-align:right;">${date}${icon}</th>`;
+        });
+
+        thHTML += `<th style="width:80px; text-align:right;">변동액</th><th style="width:90px;">종료일</th></tr>`;
+        thead.innerHTML = thHTML;
+
+        const tbody = document.querySelector("#resultTable tbody");
+        tbody.innerHTML = "";
+
+        filtered.forEach(row => {
+            const tr = document.createElement("tr");
+            let statusBadge = `<span class="text-gray-400">-</span>`;
+            if(row['상태'] === 'UP') { statusBadge = `🔺`; tr.classList.add("bg-red-row"); }
+            else if(row['상태'] === 'DOWN') { statusBadge = `🔻`; tr.classList.add("bg-green-row"); }
+            else if(row['상태'] === 'NEW') { statusBadge = `<span class="text-blue-600 font-bold">N</span>`; }
+
+            let html = `
+                <td style="text-align:center;">${statusBadge}</td>
+                <td style="font-weight:bold; color:#374151;">${row['업체명']||''}</td>
+                <td>${row['식별번호']}</td>
+                <td title="${row['규격']}" style="font-size:11px; color:#555;">${(row['규격']||'').substring(0, 30)}...</td>
+            `;
+
+            dateColumns.forEach(date => {
+                const val = row[date];
+                const displayVal = val ? parseInt(String(val).replace(/,/g,'')).toLocaleString() : '-';
+                const isToday = (date === todayKey);
+                let colorStyle = "";
+                if (isToday) {
+                    if (row['상태'] === 'UP') colorStyle = "color:#dc2626; font-weight:bold;";
+                    else if (row['상태'] === 'DOWN') colorStyle = "color:#16a34a; font-weight:bold;";
+                    else if (row['상태'] === 'NEW') colorStyle = "color:#2563eb; font-weight:bold;";
+                }
+                html += `<td style="text-align:right; ${colorStyle}">${displayVal}</td>`;
+            });
+
+            const diff = row['변동액'];
+            let diffStr = (diff > 0) ? `+${parseInt(diff).toLocaleString()}` : (diff ? parseInt(diff).toLocaleString() : '-');
+            let diffColor = (diff > 0) ? 'color:#dc2626;' : (diff < 0 ? 'color:#16a34a;' : 'color:#999;');
+
+            html += `<td style="text-align:right; font-weight:bold; ${diffColor}">${diffStr}</td><td style="font-size:11px;">${row['계약종료일']||''}</td>`;
+            tr.innerHTML = html;
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById("resultArea").classList.remove("hidden");
+        document.getElementById("count").innerText = filtered.length;
+    }
+
+    function downloadCSV() {
+        if (mergedData.length === 0) return;
+        const category = document.getElementById('categorySelect').value;
+        const today = new Date().toISOString().slice(0,10).replace(/-/g,"");
+        const finalCsvData = mergedData.map(row => {
+            let item = { '상태': row['상태'], '업체명': row['업체명'], '식별번호': row['식별번호'], '규격': row['규격'] };
+            dateColumns.forEach(d => item[d] = row[d]);
+            item['변동액'] = row['변동액'];
+            item['계약종료일'] = row['계약종료일'];
+            return item;
+        });
+        const csv = Papa.unparse(finalCsvData, { quotes: true });
+        const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `조달청_${category}_가격대장_${today}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+</script>
+
+</body>
+</html>
