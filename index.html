@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>조달청 데이터 통합 관리기 (누락방지 강력버전)</title>
+    <title>조달청 데이터 관리기 (규격확장 & 중복제거)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -26,15 +26,19 @@
         th, td { border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; padding: 8px 10px; vertical-align: middle; }
         
         thead th { position: sticky; top: 0; z-index: 30; background-color: #f3f4f6; border-top: 1px solid #e5e7eb; height: 40px; }
+        
+        /* 고정 컬럼 */
         th:nth-child(1), td:nth-child(1) { position: sticky; left: 0; z-index: 20; background-color: #f9fafb; border-right: 2px solid #e5e7eb; text-align: center;}
         th:nth-child(2), td:nth-child(2) { position: sticky; left: 50px; z-index: 20; background-color: #f9fafb; border-right: 2px solid #e5e7eb; }
         th:nth-child(3), td:nth-child(3) { position: sticky; left: 180px; z-index: 20; background-color: #f9fafb; border-right: 2px solid #dedede; }
+        
         thead th:nth-child(1), thead th:nth-child(2), thead th:nth-child(3) { z-index: 40; background-color: #e5e7eb; }
 
         .btn { padding: 8px 14px; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; border: none; font-size: 13px; transition: 0.2s; }
         .btn-blue { background-color: #2563eb; }
         .btn-green { background-color: #16a34a; }
         .btn-red { background-color: #ef4444; }
+        .btn-indigo { background-color: #4f46e5; } /* 규격 버튼용 */
         .btn:hover { opacity: 0.9; }
 
         .bg-red-row { background-color: #fef2f2 !important; }
@@ -42,12 +46,25 @@
         .sorted-header { background-color: #dbeafe !important; color: #1e40af; border-bottom: 2px solid #2563eb; }
 
         .filter-box { background-color: #eff6ff; border: 1px solid #dbeafe; padding: 10px; border-radius: 6px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;}
+
+        /* 규격 컬럼 스타일 제어 클래스 */
+        .spec-cell-compact {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .spec-cell-full {
+            max-width: none;
+            white-space: normal; /* 줄바꿈 허용 */
+            min-width: 400px;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1 class="text-2xl font-bold mb-4 text-gray-800">📊 조달청 데이터 통합 관리기 (강력분석)</h1>
+    <h1 class="text-2xl font-bold mb-4 text-gray-800">📊 조달청 데이터 통합 관리기</h1>
     
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <div class="bg-white p-4 rounded-lg shadow border border-gray-200">
@@ -57,13 +74,13 @@
         </div>
 
         <div class="bg-white p-4 rounded-lg shadow border border-gray-200">
-            <h3 class="font-bold text-gray-700 mb-2">📝 2. 오늘 데이터 입력 (전체 복사 붙여넣기)</h3>
+            <h3 class="font-bold text-gray-700 mb-2">📝 2. 오늘 데이터 입력</h3>
             <div class="flex gap-2 mb-2">
                 <select id="categorySelect" class="flex-1">
-                    <option value="인터랙티브화이트보드">인터랙티브화이트보드</option>
+                    <option value="노트북">노트북</option>
                     <option value="데스크톱컴퓨터">데스크톱컴퓨터</option>
                     <option value="모니터">모니터</option>
-                    <option value="노트북">노트북</option>
+                    <option value="인터랙티브화이트보드">인터랙티브화이트보드</option>
                     <option value="기타">기타</option>
                 </select>
                 <input type="date" id="todayDate" class="flex-1" onchange="renderTable()">
@@ -99,6 +116,8 @@
                     <option value="SAME">변동없음</option>
                 </select>
             </div>
+            <button onclick="toggleSpecView()" class="btn btn-indigo" id="specToggleBtn">↔ 규격 전체보기</button>
+            
             <div class="text-xs text-blue-800 ml-auto font-bold bg-blue-100 px-3 py-1 rounded border border-blue-200">
                 정렬: <span id="sortLabel">오늘 날짜</span> 가격 낮은순 ▲
             </div>
@@ -118,7 +137,10 @@
 
     let mergedData = [];       
     let dateColumns = [];      
-    const fixedCols = ['상태', '업체명', '식별번호', '규격', '계약종료일', '변동액', '비고'];
+    const fixedCols = ['상태', '업체명', '식별번호', '인도조건', '규격', '계약종료일', '변동액', '비고'];
+    
+    // 규격 확장 상태 변수 (false: 좁게, true: 넓게)
+    let isSpecExpanded = false;
 
     document.getElementById('prevFile').addEventListener('change', function(e) {
         const file = e.target.files[0];
@@ -131,8 +153,15 @@
                 if(results.data.length === 0) return;
                 const headers = results.meta.fields;
                 dateColumns = headers.filter(h => !fixedCols.includes(h)).sort();
-                mergedData = results.data;
-                document.getElementById('fileStatus').innerText = `✅ 기존 데이터 ${mergedData.length}건 로드됨`;
+                
+                // 중복 제거 (현장설치도 우선)
+                let tempMap = new Map();
+                results.data.forEach(row => {
+                    if(row['식별번호']) updateMapWithPriority(tempMap, row['식별번호'], row);
+                });
+                
+                mergedData = Array.from(tempMap.values());
+                document.getElementById('fileStatus').innerText = `✅ 기존 데이터 ${mergedData.length}건 로드됨 (중복제거)`;
                 updateFilters();
                 renderTable();
             }
@@ -151,14 +180,7 @@
         const todayMap = new Map();
         
         if (rawText.trim()) {
-            // ==========================================
-            // 🔥 [핵심 변경] 식별번호 기준 구간(Cluster) 분석
-            // 전체 텍스트를 줄 단위로 쪼갠 뒤, "식별번호"가 나오는 위치를 모두 찾습니다.
-            // 그리고 식별번호와 식별번호 사이의 구간을 하나의 상품 블록으로 간주합니다.
-            // ==========================================
             const lines = rawText.split('\n').map(l => l.trim());
-            
-            // 1. "식별번호" 라는 키워드가 있는 줄 번호들을 모두 찾음
             let idIndices = [];
             lines.forEach((line, index) => {
                 if (line === "식별번호" || line.startsWith("식별번호")) {
@@ -166,46 +188,44 @@
                 }
             });
 
-            // 2. 각 구간별로 데이터 파싱
             for (let i = 0; i < idIndices.length; i++) {
-                // 현재 식별번호 위치
                 const currentIndex = idIndices[i];
-                // 다음 식별번호 위치 (없으면 문서 끝까지)
                 const nextIndex = (i + 1 < idIndices.length) ? idIndices[i+1] : lines.length;
-                
-                // 검색 범위: 현재 식별번호 위쪽 15줄 ~ 다음 식별번호 직전까지
-                // (위쪽을 보는 이유: 규격과 업체명이 식별번호보다 위에 있기 때문)
                 const startIndex = Math.max(0, currentIndex - 15); 
                 const endIndex = nextIndex;
 
-                // 해당 범위의 텍스트 조각(Chunk) 추출
                 const chunkLines = lines.slice(startIndex, endIndex);
-                
-                // 파싱 실행
                 const item = parseChunk(chunkLines);
                 
-                // ID와 가격이 유효하면 저장
                 if (item.id && item.price > 0) {
-                    todayMap.set(item.id, item);
+                    updateMapWithPriorityItem(todayMap, item.id, item);
                 }
             }
         }
 
         let finalMap = new Map();
-        mergedData.forEach(row => { if(row['식별번호']) finalMap.set(row['식별번호'], row); });
+        mergedData.forEach(row => { 
+            if(row['식별번호']) finalMap.set(row['식별번호'], row);
+        });
 
         todayMap.forEach((item, id) => {
             if (finalMap.has(id)) {
                 let row = finalMap.get(id);
                 row[todayStr] = item.price;
                 row['계약종료일'] = item.endDate;
-                // 업체명 갱신 (더 정확할 수 있으므로)
-                if(item.company && item.company.length > 1) row['업체명'] = item.company; 
-                if(item.spec.length > (row['규격']||"").length) row['규격'] = item.spec;
+                
+                if (item.delivery.includes("현장설치")) {
+                    row['인도조건'] = item.delivery;
+                    row['규격'] = item.spec;
+                    if(item.company) row['업체명'] = item.company;
+                } else if (!row['인도조건']) {
+                    row['인도조건'] = item.delivery;
+                }
             } else {
                 let newRow = {
                     '업체명': item.company,
                     '식별번호': item.id,
+                    '인도조건': item.delivery,
                     '규격': item.spec,
                     '계약종료일': item.endDate,
                     [todayStr]: item.price
@@ -220,56 +240,71 @@
         renderTable();
     }
 
-    // [신규 파싱 로직] 주변 줄들을 탐색하여 정보 추출
+    function updateMapWithPriority(map, id, newRow) {
+        if (map.has(id)) {
+            const existingRow = map.get(id);
+            const existDel = existingRow['인도조건'] || "";
+            const newDel = newRow['인도조건'] || "";
+            if (!existDel.includes("현장설치") && newDel.includes("현장설치")) {
+                map.set(id, newRow);
+            }
+        } else {
+            map.set(id, newRow);
+        }
+    }
+
+    function updateMapWithPriorityItem(map, id, newItem) {
+        if (map.has(id)) {
+            const existingItem = map.get(id);
+            const existDel = existingItem.delivery || "";
+            const newDel = newItem.delivery || "";
+            if (!existDel.includes("현장설치") && newDel.includes("현장설치")) {
+                map.set(id, newItem);
+            }
+        } else {
+            map.set(id, newItem);
+        }
+    }
+
     function parseChunk(lines) {
-        let item = { company: '', id: '', spec: '', price: 0, endDate: '' };
+        let item = { company: '', id: '', spec: '', price: 0, endDate: '', delivery: '' };
         
-        // 1. 식별번호 찾기 (8자리 숫자)
-        // "식별번호" 라는 줄의 바로 다음 줄이거나, 같은 줄에 포함된 경우
         const idLabelIdx = lines.findIndex(l => l.includes("식별번호"));
         if(idLabelIdx !== -1) {
-            // 다음 줄이 숫자인 경우
             if (lines[idLabelIdx + 1] && /^\d{8,}$/.test(lines[idLabelIdx + 1])) {
                 item.id = lines[idLabelIdx + 1];
-            } 
-            // 같은 줄에 있는 경우 (혹시 몰라서)
-            else {
+            } else {
                 const match = lines[idLabelIdx].match(/\d{8,}/);
                 if(match) item.id = match[0];
             }
         }
-
-        // 식별번호를 못 찾았으면 실패
         if(!item.id) return item;
 
-        // 2. 업체명 찾기
-        // (주) 또는 주식회사, 또는 품목코드(숫자8자리) 바로 밑줄
-        // 식별번호보다 '위쪽'에 있음
         for(let i=0; i < lines.length; i++) {
-            // 품목코드(44...) 패턴 바로 다음줄이 업체명인 경우가 많음
             if (/^[가-힣a-zA-Z]+\(\d{8,}\)$/.test(lines[i]) && lines[i+1]) {
                 item.company = lines[i+1];
                 break; 
             }
-            // 혹은 직접 키워드 검색
             if ((lines[i].includes("주식회사") || lines[i].includes("(주)")) && lines[i].length < 20) {
-                 item.company = lines[i]; // 덮어쓰지 않고 후보로 둠
+                 item.company = lines[i]; 
             }
         }
 
-        // 3. 규격 찾기
-        // 품목명(카테고리)으로 시작하거나, 콤마가 많은 긴 문장
+        const delLabelIdx = lines.findIndex(l => l.includes("인도조건"));
+        if(delLabelIdx !== -1 && lines[delLabelIdx + 1]) {
+            item.delivery = lines[delLabelIdx + 1];
+        } else {
+            const delKeyword = lines.find(l => l.includes("현장설치도") || l.includes("납품장소도"));
+            if (delKeyword) item.delivery = delKeyword;
+        }
+
         const categoryVal = document.getElementById('categorySelect').value;
         const specLine = lines.find(l => 
             (l.startsWith(categoryVal) && l.includes(",")) || 
-            (l.includes(",") && l.length > 25 && !l.includes("가격범위") && !l.includes("바로가기"))
+            (l.includes(",") && l.length > 25 && !l.includes("가격범위") && !l.includes("바로가기") && !l.includes("인도조건"))
         );
         item.spec = specLine || '';
 
-        // 4. 가격 찾기
-        // "숫자,숫자원" 패턴. 식별번호보다 보통 '아래쪽'에 있음
-        // 끝에 공백이 있을 수도 있으므로 trim() 된 상태에서 정규식 확인
-        // "최저", "최고" 같은 단어가 포함된 줄은 제외
         const priceLine = lines.find(l => 
             /^[0-9,]+원$/.test(l) && !l.includes("최저") && !l.includes("최고")
         );
@@ -277,7 +312,6 @@
             item.price = parseInt(priceLine.replace(/[^0-9]/g, ''));
         }
 
-        // 5. 종료일
         const dateLine = lines.find(l => /20\d{2}\.\d{2}\.\d{2}/.test(l) && !l.includes("납품기한"));
         if(dateLine) item.endDate = dateLine;
 
@@ -306,6 +340,20 @@
         });
     }
 
+    // 규격 보기 토글 함수
+    function toggleSpecView() {
+        isSpecExpanded = !isSpecExpanded;
+        const btn = document.getElementById('specToggleBtn');
+        if(isSpecExpanded) {
+            btn.innerText = ">< 규격 좁게보기";
+            btn.classList.replace('btn-indigo', 'btn-gray');
+        } else {
+            btn.innerText = "↔ 규격 전체보기";
+            btn.classList.replace('btn-gray', 'btn-indigo');
+        }
+        renderTable();
+    }
+
     function resetData() {
         if(!confirm("모든 데이터를 초기화하시겠습니까?")) return;
         mergedData = [];
@@ -321,7 +369,6 @@
         const companySet = new Set();
         mergedData.forEach(row => { if(row['업체명']) companySet.add(row['업체명']); });
         const sortedComp = Array.from(companySet).sort();
-
         const sel = document.getElementById("companyFilter");
         const currentVal = sel.value;
         sel.innerHTML = '<option value="">전체 업체</option>';
@@ -346,14 +393,12 @@
             return matchComp && matchStat;
         });
 
-        // 정렬: 가격 오름차순 (낮은 가격 먼저)
         filtered.sort((a, b) => {
             const valA = a[todayKey];
             const valB = b[todayKey];
             const priceA = valA ? parseInt(String(valA).replace(/,/g, '')) : 0;
             const priceB = valB ? parseInt(String(valB).replace(/,/g, '')) : 0;
-            
-            if (priceA !== priceB) return priceA - priceB; // Low -> High
+            if (priceA !== priceB) return priceA - priceB; 
             return (a['업체명']||"").localeCompare(b['업체명']||"");
         });
 
@@ -362,6 +407,7 @@
             <th style="width:50px;">상태</th>
             <th style="width:130px;">업체명</th>
             <th style="width:80px;">식별번호</th>
+            <th style="width:100px;">인도조건</th>
             <th style="min-width:200px;">규격</th>`;
         
         dateColumns.forEach(date => {
@@ -377,6 +423,9 @@
         const tbody = document.querySelector("#resultTable tbody");
         tbody.innerHTML = "";
 
+        // 규격 열 스타일 결정
+        const specClass = isSpecExpanded ? 'spec-cell-full' : 'spec-cell-compact';
+
         filtered.forEach(row => {
             const tr = document.createElement("tr");
             let statusBadge = `<span class="text-gray-400">-</span>`;
@@ -388,7 +437,8 @@
                 <td style="text-align:center;">${statusBadge}</td>
                 <td style="font-weight:bold; color:#374151;">${row['업체명']||''}</td>
                 <td>${row['식별번호']}</td>
-                <td title="${row['규격']}" style="font-size:11px; color:#555;">${(row['규격']||'').substring(0, 30)}...</td>
+                <td style="color:#666; font-size:11px;">${row['인도조건']||''}</td>
+                <td class="${specClass}" title="${row['규격']}" style="font-size:11px; color:#555;">${row['규격']||''}</td>
             `;
 
             dateColumns.forEach(date => {
@@ -422,7 +472,7 @@
         const category = document.getElementById('categorySelect').value;
         const today = new Date().toISOString().slice(0,10).replace(/-/g,"");
         const finalCsvData = mergedData.map(row => {
-            let item = { '상태': row['상태'], '업체명': row['업체명'], '식별번호': row['식별번호'], '규격': row['규격'] };
+            let item = { '상태': row['상태'], '업체명': row['업체명'], '식별번호': row['식별번호'], '인도조건': row['인도조건'], '규격': row['규격'] };
             dateColumns.forEach(d => item[d] = row[d]);
             item['변동액'] = row['변동액'];
             item['계약종료일'] = row['계약종료일'];
