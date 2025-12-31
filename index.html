@@ -2,8 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>조달청 데이터 관리기 (규격확장 & 중복제거)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 나라장터 정보화기기 가격 축적용   <title>titlee
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -38,7 +37,8 @@
         .btn-blue { background-color: #2563eb; }
         .btn-green { background-color: #16a34a; }
         .btn-red { background-color: #ef4444; }
-        .btn-indigo { background-color: #4f46e5; } /* 규격 버튼용 */
+        .btn-indigo { background-color: #4f46e5; }
+        .btn-gray { background-color: #6b7280; }
         .btn:hover { opacity: 0.9; }
 
         .bg-red-row { background-color: #fef2f2 !important; }
@@ -47,7 +47,7 @@
 
         .filter-box { background-color: #eff6ff; border: 1px solid #dbeafe; padding: 10px; border-radius: 6px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;}
 
-        /* 규격 컬럼 스타일 제어 클래스 */
+        /* 규격 스타일 */
         .spec-cell-compact {
             max-width: 200px;
             overflow: hidden;
@@ -56,7 +56,7 @@
         }
         .spec-cell-full {
             max-width: none;
-            white-space: normal; /* 줄바꿈 허용 */
+            white-space: normal;
             min-width: 400px;
         }
     </style>
@@ -116,6 +116,7 @@
                     <option value="SAME">변동없음</option>
                 </select>
             </div>
+            
             <button onclick="toggleSpecView()" class="btn btn-indigo" id="specToggleBtn">↔ 규격 전체보기</button>
             
             <div class="text-xs text-blue-800 ml-auto font-bold bg-blue-100 px-3 py-1 rounded border border-blue-200">
@@ -139,7 +140,7 @@
     let dateColumns = [];      
     const fixedCols = ['상태', '업체명', '식별번호', '인도조건', '규격', '계약종료일', '변동액', '비고'];
     
-    // 규격 확장 상태 변수 (false: 좁게, true: 넓게)
+    // 규격 확장 상태 (false: 좁게, true: 넓게)
     let isSpecExpanded = false;
 
     document.getElementById('prevFile').addEventListener('change', function(e) {
@@ -154,14 +155,15 @@
                 const headers = results.meta.fields;
                 dateColumns = headers.filter(h => !fixedCols.includes(h)).sort();
                 
-                // 중복 제거 (현장설치도 우선)
+                // CSV 로드 시에는 중복이 거의 없다고 가정하지만, 
+                // 안전을 위해 식별번호가 같으면 덮어쓰기 (후순위 데이터가 남음)
                 let tempMap = new Map();
                 results.data.forEach(row => {
-                    if(row['식별번호']) updateMapWithPriority(tempMap, row['식별번호'], row);
+                    if(row['식별번호']) tempMap.set(row['식별번호'], row);
                 });
                 
                 mergedData = Array.from(tempMap.values());
-                document.getElementById('fileStatus').innerText = `✅ 기존 데이터 ${mergedData.length}건 로드됨 (중복제거)`;
+                document.getElementById('fileStatus').innerText = `✅ 기존 데이터 ${mergedData.length}건 로드됨`;
                 updateFilters();
                 renderTable();
             }
@@ -198,7 +200,8 @@
                 const item = parseChunk(chunkLines);
                 
                 if (item.id && item.price > 0) {
-                    updateMapWithPriorityItem(todayMap, item.id, item);
+                    // [핵심 로직] 가격이 높은 것을 우선하여 Map에 저장
+                    updateMapWithHighPrice(todayMap, item.id, item);
                 }
             }
         }
@@ -214,13 +217,10 @@
                 row[todayStr] = item.price;
                 row['계약종료일'] = item.endDate;
                 
-                if (item.delivery.includes("현장설치")) {
-                    row['인도조건'] = item.delivery;
-                    row['규격'] = item.spec;
-                    if(item.company) row['업체명'] = item.company;
-                } else if (!row['인도조건']) {
-                    row['인도조건'] = item.delivery;
-                }
+                // 오늘 데이터(높은 가격으로 선정된 것)로 정보 업데이트
+                row['인도조건'] = item.delivery;
+                row['규격'] = item.spec;
+                if(item.company) row['업체명'] = item.company;
             } else {
                 let newRow = {
                     '업체명': item.company,
@@ -240,26 +240,22 @@
         renderTable();
     }
 
-    function updateMapWithPriority(map, id, newRow) {
-        if (map.has(id)) {
-            const existingRow = map.get(id);
-            const existDel = existingRow['인도조건'] || "";
-            const newDel = newRow['인도조건'] || "";
-            if (!existDel.includes("현장설치") && newDel.includes("현장설치")) {
-                map.set(id, newRow);
-            }
-        } else {
-            map.set(id, newRow);
-        }
-    }
-
-    function updateMapWithPriorityItem(map, id, newItem) {
+    // [헬퍼] 맵 업데이트 시 가격 비교 (높은 가격 승리)
+    function updateMapWithHighPrice(map, id, newItem) {
         if (map.has(id)) {
             const existingItem = map.get(id);
-            const existDel = existingItem.delivery || "";
-            const newDel = newItem.delivery || "";
-            if (!existDel.includes("현장설치") && newDel.includes("현장설치")) {
+            const oldPrice = existingItem.price;
+            const newPrice = newItem.price;
+
+            // 새로운 데이터의 가격이 더 비싸면 덮어쓰기
+            if (newPrice > oldPrice) {
                 map.set(id, newItem);
+            } 
+            // 가격이 같으면? 현장설치도 우선 (동점자 처리)
+            else if (newPrice === oldPrice) {
+                 if (!existingItem.delivery.includes("현장설치") && newItem.delivery.includes("현장설치")) {
+                     map.set(id, newItem);
+                 }
             }
         } else {
             map.set(id, newItem);
@@ -340,7 +336,7 @@
         });
     }
 
-    // 규격 보기 토글 함수
+    // 규격 보기 토글 함수 (텍스트 변경 적용)
     function toggleSpecView() {
         isSpecExpanded = !isSpecExpanded;
         const btn = document.getElementById('specToggleBtn');
@@ -423,7 +419,6 @@
         const tbody = document.querySelector("#resultTable tbody");
         tbody.innerHTML = "";
 
-        // 규격 열 스타일 결정
         const specClass = isSpecExpanded ? 'spec-cell-full' : 'spec-cell-compact';
 
         filtered.forEach(row => {
