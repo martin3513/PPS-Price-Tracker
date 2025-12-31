@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>나라장터 정보화 기기 가격 추적기 </title>
+    <title>나라장터 정보화 기기 가격 추적기</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -27,9 +27,12 @@
         
         thead th { position: sticky; top: 0; z-index: 30; background-color: #f3f4f6; border-top: 1px solid #e5e7eb; height: 40px; }
         
-        /* 고정 컬럼 */
+        /* 고정 컬럼 (인도조건 삭제로 인덱스 조정) */
+        /* 1열: 상태 */
         th:nth-child(1), td:nth-child(1) { position: sticky; left: 0; z-index: 20; background-color: #f9fafb; border-right: 2px solid #e5e7eb; text-align: center;}
+        /* 2열: 업체명 */
         th:nth-child(2), td:nth-child(2) { position: sticky; left: 50px; z-index: 20; background-color: #f9fafb; border-right: 2px solid #e5e7eb; }
+        /* 3열: 식별번호 */
         th:nth-child(3), td:nth-child(3) { position: sticky; left: 180px; z-index: 20; background-color: #f9fafb; border-right: 2px solid #dedede; }
         
         thead th:nth-child(1), thead th:nth-child(2), thead th:nth-child(3) { z-index: 40; background-color: #e5e7eb; }
@@ -50,7 +53,7 @@
 
         /* 규격 스타일 */
         .spec-cell-compact {
-            max-width: 200px;
+            max-width: 250px; /* 인도조건이 빠져서 조금 더 넓게 */
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -65,7 +68,7 @@
 <body>
 
 <div class="container">
-    <h1 class="text-2xl font-bold mb-4 text-gray-800">📊 조달청 데이터 통합 관리기</h1>
+    <h1 class="text-2xl font-bold mb-4 text-gray-800">📊 나라장터 정보화 기기 가격 추적기</h1>
     
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <div class="bg-white p-4 rounded-lg shadow border border-gray-200">
@@ -139,7 +142,8 @@
 
     let mergedData = [];       
     let dateColumns = [];      
-    const fixedCols = ['상태', '업체명', '식별번호', '인도조건', '규격', '계약종료일', '변동액', '비고'];
+    // 2. 인도조건 컬럼 제외
+    const fixedCols = ['상태', '업체명', '식별번호', '규격', '계약종료일', '변동액', '비고'];
     let isSpecExpanded = false;
 
     document.getElementById('prevFile').addEventListener('change', function(e) {
@@ -182,7 +186,6 @@
             const lines = rawText.split('\n').map(l => l.trim());
             let idIndices = [];
             lines.forEach((line, index) => {
-                // 식별번호 키워드 위치 찾기
                 if (line === "식별번호" || line.startsWith("식별번호")) {
                     idIndices.push(index);
                 }
@@ -192,22 +195,20 @@
                 const currentIndex = idIndices[i];
                 const nextIndex = (i + 1 < idIndices.length) ? idIndices[i+1] : lines.length;
                 
-                // 식별번호 주변 15줄 위 ~ 다음 식별번호 전까지를 하나의 덩어리로 인식
+                // 식별번호 주변 탐색 범위 설정
                 const startIndex = Math.max(0, currentIndex - 15); 
                 const endIndex = nextIndex;
 
                 const chunkLines = lines.slice(startIndex, endIndex);
                 const item = parseChunk(chunkLines);
                 
-                // ID와 가격이 모두 유효한 경우만 저장
                 if (item.id && item.price > 0) {
-                    // [핵심] 중복 발생 시 '가격이 높은 것'으로 덮어쓰기
+                    // 1. 중복 시 가격 높은(현장설치도) 데이터로 덮어쓰기
                     updateMapWithHighPrice(todayMap, item.id, item);
                 }
             }
         }
 
-        // 기존 데이터와 병합
         let finalMap = new Map();
         mergedData.forEach(row => { 
             if(row['식별번호']) finalMap.set(row['식별번호'], row);
@@ -220,10 +221,7 @@
                 row[todayStr] = item.price;
                 row['계약종료일'] = item.endDate;
                 
-                // [중요] 오늘 들어온 데이터가 '가격이 높은' 데이터이므로
-                // 인도조건과 규격 정보를 최신화합니다.
-                // (이전 로직에서는 현장설치도일때만 바꿨으나, 이제는 오늘 선택된게 왕입니다)
-                row['인도조건'] = item.delivery;
+                // 높은 가격(현장설치도) 데이터로 메타 정보 업데이트
                 row['규격'] = item.spec;
                 if(item.company) row['업체명'] = item.company;
 
@@ -231,7 +229,6 @@
                 let newRow = {
                     '업체명': item.company,
                     '식별번호': item.id,
-                    '인도조건': item.delivery,
                     '규격': item.spec,
                     '계약종료일': item.endDate,
                     [todayStr]: item.price
@@ -246,18 +243,18 @@
         renderTable();
     }
 
-    // [헬퍼] 중복 데이터 처리 로직 (높은 가격 승리)
+    // [핵심] 가격이 높은 것을 우선 저장 (현장설치도 > 납품장소도)
     function updateMapWithHighPrice(map, id, newItem) {
         if (map.has(id)) {
             const existingItem = map.get(id);
             const oldPrice = existingItem.price;
             const newPrice = newItem.price;
 
-            // 1. 가격이 더 비싸면 무조건 교체
+            // 가격이 더 높으면 덮어씀
             if (newPrice > oldPrice) {
                 map.set(id, newItem);
             } 
-            // 2. 가격이 같으면? '현장설치도'를 가진 놈이 이김
+            // 가격이 같을 경우 현장설치도 우선 (혹시 몰라서)
             else if (newPrice === oldPrice) {
                 const newDel = newItem.delivery || "";
                 const oldDel = existingItem.delivery || "";
@@ -265,9 +262,7 @@
                     map.set(id, newItem);
                 }
             }
-            // 가격이 더 싸면? 무시함 (기존 높은 가격 데이터 유지)
         } else {
-            // 처음 들어오는 ID면 그냥 저장
             map.set(id, newItem);
         }
     }
@@ -275,7 +270,7 @@
     function parseChunk(lines) {
         let item = { company: '', id: '', spec: '', price: 0, endDate: '', delivery: '' };
         
-        // 1. 식별번호 찾기
+        // 식별번호
         const idLabelIdx = lines.findIndex(l => l.includes("식별번호"));
         if(idLabelIdx !== -1) {
             if (lines[idLabelIdx + 1] && /^\d{8,}$/.test(lines[idLabelIdx + 1])) {
@@ -287,7 +282,7 @@
         }
         if(!item.id) return item;
 
-        // 2. 업체명 찾기
+        // 업체명
         for(let i=0; i < lines.length; i++) {
             if (/^[가-힣a-zA-Z]+\(\d{8,}\)$/.test(lines[i]) && lines[i+1]) {
                 item.company = lines[i+1];
@@ -298,7 +293,7 @@
             }
         }
 
-        // 3. 인도조건 찾기
+        // 인도조건 (내부적으로 파싱은 하되 화면엔 표시 안함)
         const delLabelIdx = lines.findIndex(l => l.includes("인도조건"));
         if(delLabelIdx !== -1 && lines[delLabelIdx + 1]) {
             item.delivery = lines[delLabelIdx + 1];
@@ -307,7 +302,7 @@
             if (delKeyword) item.delivery = delKeyword;
         }
 
-        // 4. 규격 찾기
+        // 규격
         const categoryVal = document.getElementById('categorySelect').value;
         const specLine = lines.find(l => 
             (l.startsWith(categoryVal) && l.includes(",")) || 
@@ -315,18 +310,16 @@
         );
         item.spec = specLine || '';
 
-        // 5. 가격 찾기 (정규식 완화)
-        // "숫자,숫자원" 패턴을 찾되, 앞뒤에 다른 글자가 있어도 숫자만 추출
+        // 가격 (강력한 정규식)
         const priceLine = lines.find(l => /[0-9,]+원/.test(l) && !l.includes("최저") && !l.includes("최고"));
         if (priceLine) {
-            // "545,000원" 부분만 추출해서 숫자로 변환
             const match = priceLine.match(/([0-9,]+)원/);
             if (match) {
                 item.price = parseInt(match[1].replace(/,/g, ''));
             }
         }
 
-        // 6. 종료일 찾기
+        // 종료일
         const dateLine = lines.find(l => /20\d{2}\.\d{2}\.\d{2}/.test(l) && !l.includes("납품기한"));
         if(dateLine) item.endDate = dateLine;
 
@@ -407,21 +400,24 @@
             return matchComp && matchStat;
         });
 
+        // 정렬: 가격 오름차순 (낮은 가격 -> 높은 가격)
         filtered.sort((a, b) => {
             const valA = a[todayKey];
             const valB = b[todayKey];
             const priceA = valA ? parseInt(String(valA).replace(/,/g, '')) : 0;
             const priceB = valB ? parseInt(String(valB).replace(/,/g, '')) : 0;
+            
+            // 0원(데이터 없음)은 맨 뒤로? 여기선 그냥 0으로 취급
             if (priceA !== priceB) return priceA - priceB; 
             return (a['업체명']||"").localeCompare(b['업체명']||"");
         });
 
         const thead = document.querySelector("#resultTable thead");
+        // 인도조건 <th> 제거됨
         let thHTML = `<tr>
             <th style="width:50px;">상태</th>
             <th style="width:130px;">업체명</th>
             <th style="width:80px;">식별번호</th>
-            <th style="width:100px;">인도조건</th>
             <th style="min-width:200px;">규격</th>`;
         
         dateColumns.forEach(date => {
@@ -446,11 +442,11 @@
             else if(row['상태'] === 'DOWN') { statusBadge = `🔻`; tr.classList.add("bg-green-row"); }
             else if(row['상태'] === 'NEW') { statusBadge = `<span class="text-blue-600 font-bold">N</span>`; }
 
+            // 인도조건 <td> 제거됨
             let html = `
                 <td style="text-align:center;">${statusBadge}</td>
                 <td style="font-weight:bold; color:#374151;">${row['업체명']||''}</td>
                 <td>${row['식별번호']}</td>
-                <td style="color:#666; font-size:11px;">${row['인도조건']||''}</td>
                 <td class="${specClass}" title="${row['규격']}" style="font-size:11px; color:#555;">${row['규격']||''}</td>
             `;
 
@@ -484,8 +480,9 @@
         if (mergedData.length === 0) return;
         const category = document.getElementById('categorySelect').value;
         const today = new Date().toISOString().slice(0,10).replace(/-/g,"");
+        // 인도조건 제외하고 CSV 생성
         const finalCsvData = mergedData.map(row => {
-            let item = { '상태': row['상태'], '업체명': row['업체명'], '식별번호': row['식별번호'], '인도조건': row['인도조건'], '규격': row['규격'] };
+            let item = { '상태': row['상태'], '업체명': row['업체명'], '식별번호': row['식별번호'], '규격': row['규격'] };
             dateColumns.forEach(d => item[d] = row[d]);
             item['변동액'] = row['변동액'];
             item['계약종료일'] = row['계약종료일'];
