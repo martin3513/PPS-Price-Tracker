@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,266 +8,584 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
-        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f3f4f6; }
-        .container { max-width: 98%; margin: 0 auto; padding: 20px; }
-        
-        .table-wrapper { 
-            overflow-x: auto; 
-            max-height: 750px; 
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
-            border-radius: 8px; 
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        .container {
+            max-width: 98%;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            max-height: 750px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
             border: 1px solid #e5e7eb;
             position: relative;
             background: white;
         }
-        
-        table { border-collapse: separate; border-spacing: 0; background: white; font-size: 13px; white-space: nowrap; width: 100%; }
-        th, td { border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; padding: 10px 12px; vertical-align: middle; }
-        
-        thead th { position: sticky; top: 0; z-index: 30; background-color: #f3f4f6; border-top: 1px solid #e5e7eb; height: 45px; font-weight: bold; color: #4b5563; }
-        
+
+        table {
+            border-collapse: separate;
+            border-spacing: 0;
+            background: white;
+            font-size: 13px;
+            white-space: nowrap;
+            width: 100%;
+        }
+
+        th,
+        td {
+            border-bottom: 1px solid #e5e7eb;
+            border-right: 1px solid #e5e7eb;
+            padding: 10px 12px;
+            vertical-align: middle;
+        }
+
+        thead th {
+            position: sticky;
+            top: 0;
+            z-index: 30;
+            background-color: #f3f4f6;
+            border-top: 1px solid #e5e7eb;
+            height: 45px;
+            font-weight: bold;
+            color: #4b5563;
+        }
+
         /* 고정 컬럼 스타일 */
-        th:nth-child(1), td:nth-child(1) { position: sticky; left: 0; z-index: 20; background-color: #f9fafb; border-right: 2px solid #e5e7eb; text-align: center;}
-        th:nth-child(2), td:nth-child(2) { position: sticky; left: 60px; z-index: 20; background-color: #f9fafb; border-right: 2px solid #e5e7eb; }
-        th:nth-child(3), td:nth-child(3) { position: sticky; left: 210px; z-index: 20; background-color: #f9fafb; border-right: 2px solid #dedede; }
-        
-        thead th:nth-child(1), thead th:nth-child(2), thead th:nth-child(3) { z-index: 40; background-color: #e5e7eb; }
+        th:nth-child(1),
+        td:nth-child(1) {
+            position: sticky;
+            left: 0;
+            z-index: 20;
+            background-color: #f9fafb;
+            border-right: 2px solid #e5e7eb;
+            text-align: center;
+        }
 
-        .btn { padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; border: none; font-size: 14px; transition: 0.2s; }
-        .btn-blue { background-color: #2563eb; }
-        .btn-blue:hover { background-color: #1d4ed8; }
+        th:nth-child(2),
+        td:nth-child(2) {
+            position: sticky;
+            left: 60px;
+            z-index: 20;
+            background-color: #f9fafb;
+            border-right: 2px solid #e5e7eb;
+        }
 
-        .bg-red-row { background-color: #fef2f2 !important; }
-        .bg-green-row { background-color: #f0fdf4 !important; }
-        
+        th:nth-child(3),
+        td:nth-child(3) {
+            position: sticky;
+            left: 210px;
+            z-index: 20;
+            background-color: #f9fafb;
+            border-right: 2px solid #dedede;
+        }
+
+        thead th:nth-child(1),
+        thead th:nth-child(2),
+        thead th:nth-child(3) {
+            z-index: 40;
+            background-color: #e5e7eb;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            border: none;
+            font-size: 14px;
+            transition: 0.2s;
+        }
+
+        .btn-blue {
+            background-color: #2563eb;
+        }
+
+        .btn-blue:hover {
+            background-color: #1d4ed8;
+        }
+
+        .btn-green {
+            background-color: #16a34a;
+        }
+
+        .btn-green:hover {
+            opacity: 0.9;
+        }
+
+        .btn-indigo {
+            background-color: #4f46e5;
+        }
+
+        .btn-gray {
+            background-color: #6b7280;
+        }
+
+        .bg-red-row {
+            background-color: #fef2f2 !important;
+        }
+
+        .bg-green-row {
+            background-color: #f0fdf4 !important;
+        }
+
         /* 상태 배지 */
-        .status-badge { padding: 2px 6px; border-radius: 4px; font-size: 12px; font-weight: bold; }
-        .status-up { color: #dc2626; background-color: #fee2e2; }
-        .status-down { color: #16a34a; background-color: #dcfce7; }
-        .status-new { color: #2563eb; background-color: #dbeafe; }
+        .status-badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status-up {
+            color: #dc2626;
+            background-color: #fee2e2;
+        }
+
+        .status-down {
+            color: #16a34a;
+            background-color: #dcfce7;
+        }
+
+        .status-new {
+            color: #2563eb;
+            background-color: #dbeafe;
+        }
 
         .loading-spinner {
-            border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* 필터 박스 및 규격 스타일 */
+        .filter-box {
+            background-color: #eff6ff;
+            border: 1px solid #dbeafe;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .spec-cell-compact {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .spec-cell-full {
+            max-width: none;
+            white-space: normal;
+            min-width: 400px;
+        }
     </style>
 </head>
+
 <body>
 
-<div class="container">
-    <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-800 flex items-center gap-2">
-                📊 조달청 가격 변동 뷰어
-                <span class="text-sm font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded">Live Data</span>
-            </h1>
-            <p class="text-gray-500 mt-1 text-sm">GitHub 저장소의 최신 데이터를 자동으로 불러옵니다.</p>
-        </div>
+    <div class="container">
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800 flex items-center gap-2">
+                    조달청 가격 변동 뷰어
+                    <span class="text-sm font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded">Live Data</span>
+                </h1>
+                <p class="text-gray-500 mt-1 text-sm">GitHub 저장소의 최신 데이터를 자동으로 불러옵니다.</p>
+            </div>
 
-        <div class="flex items-center gap-2 bg-white p-2 rounded-lg shadow-sm border">
-            <label for="categorySelect" class="font-bold text-gray-700 px-2">📁 품목 선택:</label>
-            <select id="categorySelect" class="p-2 border rounded-md min-w-[200px] text-gray-700 font-medium outline-none focus:ring-2 focus:ring-blue-500" onchange="loadData()">
-                <option value="notebook">노트북 (notebook.csv)</option>
-                <option value="desktop">데스크톱컴퓨터 (desktop.csv)</option>
-                <option value="monitor">모니터 (monitor.csv)</option>
-                <option value="interactive">인터랙티브화이트보드 (interactive.csv)</option>
-            </select>
-            <button onclick="loadData()" class="btn btn-blue ml-2">🔄 새로고침</button>
-        </div>
-    </div>
-
-    <!-- 상태 메시지 영역 -->
-    <div id="statusArea" class="hidden mb-4 p-4 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center gap-3">
-        <div id="spinner" class="loading-spinner hidden"></div>
-        <span id="statusText" class="text-blue-700 font-bold">데이터를 불러오는 중입니다...</span>
-    </div>
-
-    <!-- 결과 테이블 영역 -->
-    <div id="resultArea" class="hidden animate-fade-in">
-        <div class="flex justify-between items-center mb-2 px-1">
-            <h2 class="text-xl font-bold text-gray-700">📋 분석 결과 (<span id="count">0</span>건)</h2>
-            <div class="text-xs text-gray-500">
-                * 최근 날짜 기준 가격 오름차순 정렬됨
+            <div class="flex items-center gap-2 bg-white p-2 rounded-lg shadow-sm border">
+                <label for="categorySelect" class="font-bold text-gray-700 px-2">품목 선택:</label>
+                <select id="categorySelect"
+                    class="p-2 border rounded-md min-w-[200px] text-gray-700 font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                    onchange="loadData()">
+                    <option value="노트북">노트북</option>
+                    <option value="데스크톱컴퓨터">데스크톱컴퓨터</option>
+                    <option value="모니터">모니터</option>
+                    <option value="인터랙티브화이트보드">인터랙티브화이트보드</option>
+                </select>
+                <button onclick="loadData()" class="btn btn-blue ml-2">새로고침</button>
             </div>
         </div>
-        
-        <div class="table-wrapper">
-            <table id="resultTable" class="w-full">
-                <thead>
-                    <!-- 헤더는 JS로 동적 생성 -->
-                </thead>
-                <tbody>
-                    <!-- 데이터는 JS로 동적 생성 -->
-                </tbody>
-            </table>
+
+        <!-- 상태 메시지 영역 -->
+        <div id="statusArea"
+            class="hidden mb-4 p-4 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center gap-3">
+            <div id="spinner" class="loading-spinner hidden"></div>
+            <span id="statusText" class="text-blue-700 font-bold">데이터를 불러오는 중입니다...</span>
+        </div>
+
+        <!-- 결과 테이블 영역 -->
+        <div id="resultArea" class="hidden animate-fade-in">
+            <div class="flex justify-between items-end mb-2 px-1">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-700 mb-1">분석 결과 (<span id="count">0</span>건)</h2>
+                    <div class="text-xs text-gray-500">* 최근 날짜 기준 가격 오름차순 정렬됨</div>
+                </div>
+                <button onclick="downloadCSV()" class="btn btn-green">엑셀(CSV) 다운로드</button>
+            </div>
+
+            <!-- 필터 박스 추가 -->
+            <div class="filter-box">
+                <div>
+                    <label class="font-bold text-gray-700 mr-2">업체명:</label>
+                    <select id="companyFilter" onchange="renderTable()" class="p-1 border rounded"
+                        style="width: 150px;">
+                        <option value="">전체 업체</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="font-bold text-gray-700 mr-2">상태:</label>
+                    <select id="statusFilter" onchange="renderTable()" class="p-1 border rounded" style="width: 120px;">
+                        <option value="">전체 보기</option>
+                        <option value="UP">인상 (🔺)</option>
+                        <option value="DOWN">인하 (🔻)</option>
+                        <option value="NEW">신규</option>
+                        <option value="SAME">변동없음</option>
+                    </select>
+                </div>
+
+                <button onclick="toggleSpecView()" class="btn btn-indigo" id="specToggleBtn">↔ 규격 전체보기</button>
+            </div>
+
+            <div class="table-wrapper">
+                <table id="resultTable" class="w-full">
+                    <thead>
+                        <!-- 헤더는 JS로 동적 생성 -->
+                    </thead>
+                    <tbody>
+                        <!-- 데이터는 JS로 동적 생성 -->
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
-</div>
 
-<script>
-    const REPO_OWNER = "martin3513";
-    const REPO_NAME = "PPS-Price-Tracker";
-    const BRANCH = "main";
-    
-    // 데이터 로드 함수
-    async function loadData() {
-        const category = document.getElementById('categorySelect').value;
-        const fileName = `${category}.csv`;
-        // GitHub Raw Data URL 구조
-        const url = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/data/${fileName}`;
+    <script>
+        const REPO_OWNER = "martin3513";
+        const REPO_NAME = "PPS-Price-Tracker";
+        const DATA_DIR = "data";
 
-        showStatus(true, `데이터를 불러오는 중... (${fileName})`);
-        document.getElementById('resultArea').classList.add('hidden');
+        let globalData = [];    // 전체 데이터 저장용
+        let globalHeaders = []; // 헤더 정보 저장용
+        let isSpecExpanded = false; // 규격 펼침 여부
 
-        try {
-            const response = await fetch(url);
-            
-            if (!response.ok) {
-                if (response.status === 404) {
-                    throw new Error(`파일을 찾을 수 없습니다.\n(data/${fileName} 파일이 저장소에 있는지 확인하세요)`);
-                }
-                throw new Error(`데이터 로드 실패 (Status: ${response.status})`);
+        // 데이터 로드 함수
+        async function loadData() {
+            const category = document.getElementById('categorySelect').value;
+            showStatus(true, `최신 데이터를 찾는 중... (${category})`);
+            document.getElementById('resultArea').classList.add('hidden');
+
+            // 로컬 파일 실행 시 경고 (단, 계속 진행은 시도)
+            if (window.location.protocol === 'file:') {
+                console.warn("로컬 파일(file://) 환경에서는 GitHub API 호출이 차단되거나 CORS 오류가 발생할 수 있습니다.");
             }
 
-            const csvText = await response.text();
-            parseAndRender(csvText);
+            try {
+                // 1. GitHub API로 data 폴더 목록 조회
+                const cleanApiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${DATA_DIR}`;
 
-        } catch (error) {
-            showStatus(false, `❌ 오류 발생: ${error.message}`, true);
+                const listResponse = await fetch(cleanApiUrl);
+
+                if (!listResponse.ok) {
+                    if (listResponse.status === 404) {
+                        throw new Error(`저장소에 'data' 폴더가 없거나, 아직 파일이 업로드(Push)되지 않았습니다.\n(GitHub에 파일을 올리셨나요?)`);
+                    }
+                    const errJson = await listResponse.json();
+                    throw new Error(`파일 목록 조회 실패 (${listResponse.status}): ${errJson.message || listResponse.statusText}`);
+                }
+
+                const files = await listResponse.json();
+
+                // 2. 파일 필터링: "조달청_{카테고리}_가격대장_" 으로 시작하고 ".csv"로 끝나는 파일
+                const prefix = `조달청_${category}_가격대장_`;
+
+                const matchedFiles = files.filter(file => {
+                    return file.name.startsWith(prefix) && file.name.endsWith(".csv");
+                });
+
+                if (matchedFiles.length === 0) {
+                    throw new Error(`'${category}' 관련 파일을 GitHub에서 찾을 수 없습니다.\n파일명 예시: ${prefix}20250103.csv`);
+                }
+
+                // 3. 최신 날짜순 정렬 (파일명에 포함된 날짜 숫자 추출하여 비교)
+                // 예: 조달청_노트북_가격대장_20250103.csv -> 20250103
+                matchedFiles.sort((a, b) => {
+                    const getDate = (name) => {
+                        const match = name.match(/(\d{8})/); // 8자리 연속 숫자 추출
+                        return match ? parseInt(match[1]) : 0;
+                    };
+                    return getDate(b.name) - getDate(a.name); // 내림차순 (큰 숫자가 먼저)
+                });
+
+                const latestFile = matchedFiles[0];
+                const downloadUrl = latestFile.download_url;
+
+                console.log("Loading latest file:", latestFile.name);
+                showStatus(true, `데이터 다운로드 중... (${latestFile.name})`);
+
+                // 4. CSV 다운로드
+                const csvResponse = await fetch(downloadUrl);
+                if (!csvResponse.ok) throw new Error("CSV 파일 다운로드 실패");
+
+                const csvText = await csvResponse.text();
+                parseAndRender(csvText);
+
+            } catch (error) {
+                let msg = error.message;
+                if (window.location.protocol === 'file:' && !msg.includes("Push")) {
+                    msg += `\n\n(참고: 로컬 파일(file://) 실행 시 CORS 보안 정책으로 인해 데이터를 못 가져올 수 있습니다. GitHub Pages를 이용하거나 로컬 서버를 띄워주세요.)`;
+                }
+                showStatus(false, `오류 발생: ${msg}`, true);
+            }
         }
-    }
 
-    function showStatus(isLoading, message, isError = false) {
-        const area = document.getElementById('statusArea');
-        const spinner = document.getElementById('spinner');
-        const text = document.getElementById('statusText');
+        function showStatus(isLoading, message, isError = false) {
+            const area = document.getElementById('statusArea');
+            const spinner = document.getElementById('spinner');
+            const text = document.getElementById('statusText');
 
-        area.classList.remove('hidden');
-        text.innerText = message;
-        
-        if (isLoading) {
-            spinner.classList.remove('hidden');
-            area.className = "mb-4 p-4 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center gap-3";
-            text.className = "text-blue-700 font-bold";
-        } else {
-            spinner.classList.add('hidden');
-            if (isError) {
-                area.className = "mb-4 p-4 rounded-lg bg-red-50 border border-red-100 flex items-center justify-center gap-3";
-                text.className = "text-red-700 font-bold";
+            area.classList.remove('hidden');
+            text.innerText = message;
+
+            if (isLoading) {
+                spinner.classList.remove('hidden');
+                area.className = "mb-4 p-4 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center gap-3";
+                text.className = "text-blue-700 font-bold";
             } else {
-                area.classList.add('hidden'); // 성공 시 숨김
+                spinner.classList.add('hidden');
+                if (isError) {
+                    area.className = "mb-4 p-4 rounded-lg bg-red-50 border border-red-100 flex items-center justify-center gap-3";
+                    text.className = "text-red-700 font-bold";
+                } else {
+                    area.classList.add('hidden'); // 성공 시 숨김
+                }
             }
         }
-    }
 
-    function parseAndRender(csvText) {
-        Papa.parse(csvText, {
-            header: true,
-            skipEmptyLines: true,
-            complete: function(results) {
-                if (!results.data || results.data.length === 0) {
-                    showStatus(false, "데이터가 비어있습니다.", true);
-                    return;
+        function parseAndRender(csvText) {
+            Papa.parse(csvText, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function (results) {
+                    if (!results.data || results.data.length === 0) {
+                        showStatus(false, "데이터가 비어있습니다.", true);
+                        return;
+                    }
+
+                    showStatus(false, "완료"); // 로딩 숨김
+
+                    // 전역 데이터 저장
+                    globalData = results.data;
+                    globalHeaders = results.meta.fields;
+
+                    updateFilters(); // 업체명 필터 채우기
+                    renderTable();   // 테이블 그리기
+                },
+                error: function (err) {
+                    showStatus(false, `CSV 파싱 오류: ${err.message}`, true);
                 }
-                
-                showStatus(false, "완료"); // 로딩 숨김
-                renderTable(results.data, results.meta.fields);
-            },
-            error: function(err) {
-                showStatus(false, `CSV 파싱 오류: ${err.message}`, true);
+            });
+        }
+
+        // 업체명 옵션 업데이트
+        function updateFilters() {
+            const companySet = new Set();
+            globalData.forEach(row => {
+                if (row['업체명']) companySet.add(row['업체명']);
+            });
+            const sortedComp = Array.from(companySet).sort();
+
+            const sel = document.getElementById("companyFilter");
+            const currentVal = sel.value; // 기존 선택값 유지 시도
+            sel.innerHTML = '<option value="">전체 업체</option>';
+
+            sortedComp.forEach(c => {
+                const op = document.createElement("option");
+                op.value = c;
+                op.innerText = c;
+                sel.appendChild(op);
+            });
+
+            if (sortedComp.includes(currentVal)) {
+                sel.value = currentVal;
             }
-        });
-    }
+        }
 
-    function renderTable(data, headers) {
-        const tableHead = document.querySelector("#resultTable thead");
-        const tableBody = document.querySelector("#resultTable tbody");
-        
-        // 컬럼 분류
-        const fixedCols = ['상태', '업체명', '식별번호', '규격', '계약종료일', '변동액', '비고'];
-        const dateCols = headers.filter(h => !fixedCols.includes(h)).sort().reverse(); // 최신 날짜가 맨 앞으로 오게 역순 정렬
-        
-        // 정렬: 최신 날짜 가격 오름차순
-        const latestDate = dateCols[0];
-        data.sort((a, b) => {
-            const priceA = parseInt((a[latestDate] || "0").replace(/,/g, ''));
-            const priceB = parseInt((b[latestDate] || "0").replace(/,/g, ''));
-            if (priceA !== priceB) return priceA - priceB;
-            return a['업체명'].localeCompare(b['업체명']);
-        });
+        function toggleSpecView() {
+            isSpecExpanded = !isSpecExpanded;
+            const btn = document.getElementById('specToggleBtn');
+            if (isSpecExpanded) {
+                btn.innerText = ">< 규격 좁게보기";
+                btn.classList.replace('btn-indigo', 'btn-gray');
+            } else {
+                btn.innerText = "↔ 규격 전체보기";
+                btn.classList.replace('btn-gray', 'btn-indigo');
+            }
+            renderTable();
+        }
 
-        // 1. 헤더 생성
-        let thHTML = `<tr>
+        function renderTable() {
+            const companyVal = document.getElementById("companyFilter").value;
+            const statusVal = document.getElementById("statusFilter").value;
+
+            const tableHead = document.querySelector("#resultTable thead");
+            const tableBody = document.querySelector("#resultTable tbody");
+
+            // 컬럼 분류
+            const fixedCols = ['상태', '업체명', '식별번호', '규격', '계약종료일', '변동액', '비고'];
+            // 날짜 컬럼 정렬: 문자열 기준 오름차순 (과거 -> 최신)
+            // 2025-12-17, 2025-12-24, 2025-12-25 순서
+            const dateCols = globalHeaders.filter(h => !fixedCols.includes(h)).sort();
+
+            // 필터링
+            let filtered = globalData.filter(row => {
+                const matchComp = (companyVal === "") || (row['업체명'] === companyVal);
+                const matchStat = (statusVal === "") || (row['상태'] === statusVal);
+                return matchComp && matchStat;
+            });
+
+
+            // 정렬: *최근* 날짜 가격 오름차순
+            // dateCols가 오름차순(과거->최신)이므로, 맨 뒤(length-1)가 최신 날짜
+            const latestDate = dateCols[dateCols.length - 1];
+            filtered.sort((a, b) => {
+                const priceA = parseInt((a[latestDate] || "0").replace(/,/g, ''));
+                const priceB = parseInt((b[latestDate] || "0").replace(/,/g, ''));
+                if (priceA !== priceB) return priceA - priceB;
+                return a['업체명'].localeCompare(b['업체명']);
+            });
+
+            document.getElementById('count').innerText = filtered.length;
+
+            // 1. 헤더 생성
+            let thHTML = `<tr>
             <th class="w-[60px]">상태</th>
             <th class="w-[150px]">업체명</th>
             <th class="w-[100px]">식별번호</th>
             <th class="w-[300px]">규격</th>`;
-        
-        dateCols.forEach((date, idx) => {
-            const isLatest = idx === 0;
-            const style = isLatest ? 'background-color:#dbeafe; color:#1e40af; border-bottom:2px solid #2563eb;' : '';
-            thHTML += `<th style="text-align:right; min-width:90px; ${style}">${date}</th>`;
-        });
-        
-        thHTML += `<th style="text-align:right;">변동액</th><th>종료일</th></tr>`;
-        tableHead.innerHTML = thHTML;
 
-        // 2. 바디 생성
-        let tbodyHTML = "";
-        data.forEach(row => {
-            const status = row['상태'];
-            let rowClass = "";
-            let statusHTML = `<span class="text-gray-400">-</span>`;
+            dateCols.forEach((date, idx) => {
+                // 최신 날짜인지 확인 (마지막 컬럼)
+                const isLatest = (idx === dateCols.length - 1);
+                const style = isLatest ? 'background-color:#dbeafe; color:#1e40af; border-bottom:2px solid #2563eb;' : '';
+                thHTML += `<th style="text-align:right; min-width:90px; ${style}">${date}</th>`;
+            });
 
-            if (status === 'UP') {
-                rowClass = "bg-red-row";
-                statusHTML = `<span class="status-badge status-up">인상 🔺</span>`;
-            } else if (status === 'DOWN') {
-                rowClass = "bg-green-row";
-                statusHTML = `<span class="status-badge status-down">인하 🔻</span>`;
-            } else if (status === 'NEW') {
-                statusHTML = `<span class="status-badge status-new">신규 🆕</span>`;
-            }
+            thHTML += `<th style="text-align:right;">변동액</th><th>종료일</th></tr>`;
+            tableHead.innerHTML = thHTML;
 
-            tbodyHTML += `<tr class="${rowClass}">
+            // 2. 바디 생성
+            let tbodyHTML = "";
+            const specClass = isSpecExpanded ? 'spec-cell-full' : 'spec-cell-compact';
+
+            filtered.forEach(row => {
+                const status = row['상태'];
+                let rowClass = "";
+                let statusHTML = `<span class="text-gray-400">-</span>`;
+
+                if (status === 'UP') {
+                    rowClass = "bg-red-row";
+                    statusHTML = `<span class="status-badge status-up">인상 🔺</span>`;
+                } else if (status === 'DOWN') {
+                    rowClass = "bg-green-row";
+                    statusHTML = `<span class="status-badge status-down">인하 🔻</span>`;
+                } else if (status === 'NEW') {
+                    statusHTML = `<span class="status-badge status-new">신규</span>`;
+                }
+
+                tbodyHTML += `<tr class="${rowClass}">
                 <td style="text-align:center;">${statusHTML}</td>
                 <td class="font-bold text-gray-700">${row['업체명'] || ''}</td>
                 <td>${row['식별번호'] || ''}</td>
-                <td title="${row['규격'] || ''}" style="max-width:300px; overflow:hidden; text-overflow:ellipsis; font-size:12px; color:#555;">
+                <td class="${specClass}" title="${row['규격'] || ''}" style="font-size:12px; color:#555;">
                     ${row['규격'] || ''}
                 </td>`;
-            
-            dateCols.forEach((date, idx) => {
-                const val = row[date];
-                const displayVal = val ? parseInt(val.replace(/,/g, '')).toLocaleString() : '-';
-                const isLatest = idx === 0;
-                let style = "text-align:right;";
-                if (isLatest) style += "font-weight:bold; color:#111827;";
-                
-                tbodyHTML += `<td style="${style}">${displayVal}</td>`;
-            });
 
-            const diff = row['변동액'];
-            let diffStr = (diff && diff !== "0") ? parseInt(diff).toLocaleString() : '-';
-            let diffStyle = "text-align:right; color:#9ca3af;";
-            if (parseInt(diff) > 0) { diffStr = "+" + diffStr; diffStyle = "text-align:right; color:#dc2626; font-weight:bold;"; }
-            else if (parseInt(diff) < 0) { diffStyle = "text-align:right; color:#16a34a; font-weight:bold;"; }
+                dateCols.forEach((date, idx) => {
+                    const val = row[date];
+                    const displayVal = val ? parseInt(val.replace(/,/g, '')).toLocaleString() : '-';
+                    const isLatest = (idx === dateCols.length - 1);
+                    let style = "text-align:right;";
+                    if (isLatest) style += "font-weight:bold; color:#111827;";
 
-            tbodyHTML += `<td style="${diffStyle}">${diffStr}</td>
+                    tbodyHTML += `<td style="${style}">${displayVal}</td>`;
+                });
+
+                const diff = row['변동액'];
+                let diffStr = (diff && diff !== "0") ? parseInt(diff).toLocaleString() : '-';
+                let diffStyle = "text-align:right; color:#9ca3af;";
+                if (parseInt(diff) > 0) {
+                    diffStr = "+" + diffStr;
+                    diffStyle = "text-align:right; color:#dc2626; font-weight:bold;";
+                } else if (parseInt(diff) < 0) {
+                    diffStyle = "text-align:right; color:#16a34a; font-weight:bold;";
+                }
+
+                tbodyHTML += `<td style="${diffStyle}">${diffStr}</td>
                           <td style="font-size:12px;">${row['계약종료일'] || ''}</td>
                           </tr>`;
-        });
+            });
 
-        tableBody.innerHTML = tbodyHTML;
-        document.getElementById('resultArea').classList.remove('hidden');
-        document.getElementById('count').innerText = data.length;
-    }
+            tableBody.innerHTML = tbodyHTML;
+            document.getElementById('resultArea').classList.remove('hidden');
+        }
 
-    // 초기 로드 시 실행
-    // window.onload = loadData; 
-    // -> 자동 실행 하려면 주석 해제. 하지만 처음엔 data 폴더가 비어있을 수 있으므로 사용자가 버튼 누르게 유도하거나, 기본값 로드 시도.
-    loadData(); // 일단 시도
-</script>
+        function downloadCSV() {
+            if (globalData.length === 0) return;
+            const category = document.getElementById('categorySelect').value;
+            const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+
+            // 표시된 데이터만 다운로드할지, 전체 데이터를 다운로드할지 결정
+            // 여기서는 보이는 대로(필터링된) 다운로드하거나, 원본 전체를 받을 수 있음.
+            // 보통 '분석 결과' 다운로드는 현재 보고 있는 전체 데이터를 의미함 (필터링 상관없이 or 필터링 적용해서)
+            // 기존 index.html 로직은 mergedData(전체)를 기준으로 했으므로 여기서도 globalData(전체)를 CSV로 변환
+            // 단, 화면에 필터링된 것만 받고 싶다면 filtered 데이터를 써야함.
+            // -> 우선 전체 데이터 저장을 기본으로 함.
+
+            const csv = Papa.unparse(globalData, {
+                quotes: true
+            });
+            const blob = new Blob(["\uFEFF" + csv], {
+                type: "text/csv;charset=utf-8;"
+            });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            // 파일명에 'download' 접미사 추가하여 구분
+            link.download = `조달청_${category}_가격대장_DOWNLOAD.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // window.onload = loadData; // 자동 실행 원하면 주석 해제
+        loadData();
+    </script>
 
 </body>
+
 </html>
