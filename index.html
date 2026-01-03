@@ -563,7 +563,16 @@
                 let html = `
                 <td style="text-align:center;">${statusBadge}</td>
                 <td style="font-weight:bold; color:#374151;">${row['업체명'] || ''}</td>
-                <td>${row['식별번호']}</td>
+                <td style="text-align:center;">
+                    <div class="cursor-pointer text-blue-600 hover:text-blue-800 flex items-center justify-center gap-1 group" 
+                         onclick="copyAndOpenG2B('${row['식별번호']}')" 
+                         title="클릭 시 식별번호 복사 후 나라장터 쇼핑몰 이동">
+                         <span>${row['식별번호']}</span>
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 00-2 2h10a2 2 0 00-2-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                    </div>
+                </td>
                 <td class="${specClass}" title="${row['규격']}" style="font-size:11px; color:#555;">${row['규격'] || ''}</td>
             `;
 
@@ -591,6 +600,17 @@
 
             document.getElementById("resultArea").classList.remove("hidden");
             document.getElementById("count").innerText = filtered.length;
+        }
+
+        async function copyAndOpenG2B(id) {
+            try {
+                await navigator.clipboard.writeText(id);
+                // alert(`식별번호(${id})가 복사되었습니다.\n검색창에 붙여넣기(Ctrl+V) 하세요.`);
+                window.open("http://shop.g2b.go.kr/", "_blank");
+            } catch (err) {
+                console.error('클립보드 복사 실패:', err);
+                window.open("http://shop.g2b.go.kr/", "_blank");
+            }
         }
 
         function downloadCSV() {
