@@ -724,7 +724,19 @@
                         if (targetRow) {
                             foundData = targetRow;
                             foundSheetName = sheetName;
-                            foundHeader1 = data[h2Idx - 1] || [];
+
+                            // 부모 헤더 행 찾기 (CPU, 메모리 등 키워드 기반 동적 검색)
+                            const keywords = ["완성PC", "컴퓨터", "CPU", "메모리", "RAM", "SSD", "하드디스크", "그래픽", "메인보드", "파워", "케이스", "업체정보"];
+                            let h1Idx = h2Idx - 1;
+                            for (let r = h2Idx - 1; r >= 0; r--) {
+                                const row = data[r] || [];
+                                if (row.some(cell => keywords.some(k => String(cell || "").includes(k)))) {
+                                    h1Idx = r;
+                                    break;
+                                }
+                            }
+
+                            foundHeader1 = data[h1Idx] || [];
                             foundHeader2 = data[h2Idx] || [];
                             break;
                         }
