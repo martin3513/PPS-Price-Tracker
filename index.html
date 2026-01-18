@@ -783,15 +783,14 @@
                             // 위에서 아래로 행을 훑으며, 각 열에 대해 마지막으로 발견된 유효한 텍스트를 카테고리로 취합
                             for (let r = 0; r < h2Idx; r++) {
                                 const currentRow = data[r] || [];
-                                let lastValueInRow = "";
+                                let currentRowValue = "";
                                 for (let c = 0; c < foundHeader2.length; c++) {
                                     const cellValue = String(currentRow[c] || "").trim();
                                     if (cellValue !== "") {
-                                        lastValueInRow = cellValue;
+                                        currentRowValue = cellValue;
                                     }
-                                    // 유의미한 텍스트(규격, 물품명 제외)가 있으면 업데이트
-                                    if (lastValueInRow !== "" && !["", "규격", "규격명", "물품명"].includes(lastValueInRow)) {
-                                        categoryMap[c] = lastValueInRow;
+                                    if (currentRowValue !== "" && !["", "규격", "규격명", "물품명", "식별번호"].some(k => currentRowValue.includes(k))) {
+                                        categoryMap[c] = currentRowValue;
                                     }
                                 }
                             }
@@ -822,7 +821,7 @@
                     if (!h) return;
 
                     const headerText = String(h).trim();
-                    if (headerText.replace(/\s/g, "").includes("물품식별번호")) return;
+                    if (headerText.includes("식별번호")) return;
 
                     const val = foundData[idx] || '-';
                     const parent = foundHeader1[idx] || '';

@@ -731,14 +731,14 @@
                             // 헤더(h2Idx) 위의 모든 행을 대상으로 유효한 카테고리명 추출
                             for (let r = 0; r < h2Idx; r++) {
                                 const currentRow = data[r] || [];
-                                let lastValueInRow = "";
+                                let currentRowValue = "";
                                 for (let c = 0; c < foundHeader2.length; c++) {
                                     const cellValue = String(currentRow[c] || "").trim();
                                     if (cellValue !== "") {
-                                        lastValueInRow = cellValue;
+                                        currentRowValue = cellValue;
                                     }
-                                    if (lastValueInRow !== "" && !["", "규격", "규격명", "물품명"].includes(lastValueInRow)) {
-                                        categoryMap[c] = lastValueInRow;
+                                    if (currentRowValue !== "" && !["", "규격", "규격명", "물품명", "식별번호"].some(k => currentRowValue.includes(k))) {
+                                        categoryMap[c] = currentRowValue;
                                     }
                                 }
                             }
@@ -769,6 +769,8 @@
                     if (!h) return;
 
                     const headerText = String(h).trim();
+                    // "식별번호"가 포함된 행은 사양표에서 숨김
+                    if (headerText.includes("식별번호")) return;
                     const val = foundData[idx] || '-';
                     const parent = foundHeader1[idx] || '';
 
