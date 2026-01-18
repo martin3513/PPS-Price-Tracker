@@ -7,6 +7,7 @@
     <title>나라장터 정보화장비 가격 추적기</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body {
             font-family: 'Malgun Gothic', sans-serif;
@@ -178,6 +179,82 @@
             white-space: normal;
             min-width: 400px;
         }
+
+        /* 상세 정보 모달 스타일 */
+        #detailModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 25px;
+            border-radius: 12px;
+            max-width: 90%;
+            max-height: 85%;
+            overflow: auto;
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f3f4f6;
+        }
+
+        .modal-body table {
+            font-size: 13px;
+        }
+
+        .modal-body th {
+            background-color: #f9fafb;
+            color: #4b5563;
+            text-align: left;
+            position: sticky;
+            top: 0;
+        }
+
+        .close-btn {
+            cursor: pointer;
+            font-size: 24px;
+            color: #9ca3af;
+            transition: 0.2s;
+        }
+
+        .close-btn:hover {
+            color: #4b5563;
+        }
+
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
     </style>
 </head>
 
@@ -254,6 +331,26 @@
                     <thead></thead>
                     <tbody></tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 상세 정보 모달 -->
+    <div id="detailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle" class="text-xl font-bold text-gray-800">상세 규격 정보</h2>
+                <span class="close-btn" onclick="closeModal()">&times;</span>
+            </div>
+            <div id="modalBody" class="modal-body">
+                <div class="flex items-center justify-center p-10">
+                    <div class="loading-spinner"></div>
+                    <span class="ml-3 text-gray-600">데이터를 찾는 중...</span>
+                </div>
+            </div>
+            <div id="modalFooter" class="mt-4 pt-4 border-t border-gray-100 hidden">
+                <p class="text-xs text-gray-500 mb-2">※ 자동 로드 실패 시: 엑셀 파일(desktop_db.xlsx)을 직접 선택해주세요.</p>
+                <input type="file" id="excelDbFile" accept=".xlsx" class="text-xs text-gray-600">
             </div>
         </div>
     </div>
@@ -573,7 +670,12 @@
                         </svg>
                     </div>
                 </td>
-                <td class="${specClass}" title="${row['규격']}" style="font-size:11px; color:#555;">${row['규격'] || ''}</td>
+                <td class="${specClass} ${row['식별번호'] && document.getElementById('categorySelect').value === '데스크톱컴퓨터' ? 'cursor-pointer hover:bg-yellow-50 hover:text-blue-700' : ''}" 
+                    title="${row['규격'] || ''} ${document.getElementById('categorySelect').value === '데스크톱컴퓨터' ? '(클릭 시 상세정보 보기)' : ''}" 
+                    style="font-size:11px; color:#555;"
+                    onclick="${document.getElementById('categorySelect').value === '데스크톱컴퓨터' ? `showDesktopDetails('${row['식별번호']}')` : ''}">
+                    ${row['규격'] || ''}
+                </td>
             `;
 
                 dateColumns.forEach(date => {
@@ -601,6 +703,144 @@
             document.getElementById("resultArea").classList.remove("hidden");
             document.getElementById("count").innerText = filtered.length;
         }
+
+        // 데스크톱 상세 정보 보기 관련 변수
+        let desktopWorkbook = null;
+
+        async function showDesktopDetails(id) {
+            const modal = document.getElementById('detailModal');
+            const modalBody = document.getElementById('modalBody');
+            const modalTitle = document.getElementById('modalTitle');
+
+            modal.style.display = 'flex';
+            modalTitle.innerText = `상세 규격 정보 (식별번호: ${id})`;
+            modalBody.innerHTML = `
+                <div class="flex items-center justify-center p-10">
+                    <div class="loading-spinner"></div>
+                    <span class="ml-3 text-gray-600">데이터를 찾는 중...</span>
+                </div>`;
+
+            try {
+                // 1. 엑셀 파일 로드 (최초 1회만)
+                if (!desktopWorkbook) {
+                    const excelPath = `data/desktop_db.xlsx`;
+
+                    try {
+                        const response = await fetch(excelPath);
+                        if (!response.ok) {
+                            throw new Error(`파일 응답 오류 (Status: ${response.status})`);
+                        }
+                        const arrayBuffer = await response.arrayBuffer();
+                        desktopWorkbook = XLSX.read(arrayBuffer, { type: 'array' });
+                    } catch (fetchErr) {
+                        console.warn("자동 로드 실패, 수동 선택 활성화:", fetchErr);
+                        const footer = document.getElementById('modalFooter');
+                        if (footer) footer.classList.remove('hidden');
+                        throw new Error(`엑셀 파일을 자동으로 불러올 수 없습니다. (CORS 보안 또는 파일 없음)\n하단의 '파일 선택' 버튼으로 'data/desktop_db.xlsx' 파일을 직접 선택해주세요.`);
+                    }
+                }
+
+                // 2. 모든 시트에서 데이터 검색 시도
+                let foundData = null;
+                let foundSheetName = "";
+                let foundHeader1 = [];
+                let foundHeader2 = [];
+
+                for (const sheetName of desktopWorkbook.SheetNames) {
+                    const sheet = desktopWorkbook.Sheets[sheetName];
+                    const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+                    if (data.length < 8) continue; // 최소 제목행까지는 있어야 함
+
+                    const header2 = data[7] || [];
+                    const idColIndex = header2.findIndex(h => String(h).includes("물품 식별번호"));
+
+                    if (idColIndex !== -1) {
+                        const targetRow = data.find(row => {
+                            const cellValue = String(row[idColIndex] || "").trim();
+                            const searchId = String(id).trim();
+                            return cellValue === searchId;
+                        });
+
+                        if (targetRow) {
+                            foundData = targetRow;
+                            foundSheetName = sheetName;
+                            foundHeader1 = data[6] || [];
+                            foundHeader2 = header2;
+                            break; // 데이터 찾으면 중단
+                        }
+                    }
+                }
+
+                if (!foundData) {
+                    throw new Error(`모든 시트(${desktopWorkbook.SheetNames.join(", ")})를 검색했으나 식별번호(${id})를 찾을 수 없습니다.`);
+                }
+
+                // 3. 테이블 생성 (세로형)
+                let tableHTML = `<div class="mb-2 text-sm text-blue-600 font-bold">발견된 시트: ${foundSheetName}</div>
+                    <table class="min-w-full border-collapse border border-gray-200">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="border border-gray-300 p-2 w-1/3">구분 (항목)</th>
+                            <th class="border border-gray-300 p-2">상세 규격 내용</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+                foundHeader2.forEach((h, idx) => {
+                    if (!h) return;
+                    const val = foundData[idx] || '-';
+                    const parentHeader = foundHeader1[idx] ? `<span class="text-xs text-gray-400 block">${foundHeader1[idx]}</span>` : '';
+                    tableHTML += `
+                        <tr>
+                            <td class="border border-gray-300 p-2 bg-gray-50 font-medium">
+                                ${parentHeader}${h}
+                            </td>
+                            <td class="border border-gray-300 p-2">
+                                ${val}
+                            </td>
+                        </tr>`;
+                });
+
+                tableHTML += `</tbody></table>`;
+                modalBody.innerHTML = tableHTML;
+
+            } catch (error) {
+                modalBody.innerHTML = `
+                    <div class="p-8 text-center text-red-600 font-bold">
+                        오류: ${error.message}
+                    </div>`;
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').style.display = 'none';
+        }
+
+        // 모달 바깥 클릭 시 닫기
+        window.onclick = function (event) {
+            const modal = document.getElementById('detailModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+
+        // 수동 엑셀 파일 선택 처리
+        document.getElementById('excelDbFile').addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const data = new Uint8Array(e.target.result);
+                desktopWorkbook = XLSX.read(data, { type: 'array' });
+                document.getElementById('modalFooter').classList.add('hidden');
+                // 현재 열린 모달의 ID로 다시 검색 시도
+                const currentId = document.getElementById('modalTitle').innerText.match(/\d+/)[0];
+                showDesktopDetails(currentId);
+            };
+            reader.readAsArrayBuffer(file);
+        });
 
         async function copyAndOpenG2B(id) {
             try {
