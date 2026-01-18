@@ -776,19 +776,20 @@
                             foundData = targetRow;
                             foundSheetName = sheetName;
 
-                            // 부모 헤더 행 찾기 (CPU, 메모리 등 키워드 기반 동적 검색)
-                            const keywords = ["완성PC", "컴퓨터", "CPU", "메모리", "RAM", "SSD", "하드디스크", "그래픽", "메인보드", "파워", "케이스", "업체정보", "중앙처리장치", "저장장치", "비디오", "장치"];
-                            let h1Idx = h2Idx - 1;
-                            for (let r = h2Idx - 1; r >= 0; r--) {
-                                const row = data[r] || [];
-                                // 해당 행에 하나라도 키워드가 포함되어 있으면 부모 헤더 행으로 간주
-                                if (row.some(cell => keywords.some(k => String(cell || "").includes(k)))) {
-                                    h1Idx = r;
-                                    break;
+                            // 2.2 부모 카테고리 정보 추출 (사용자 요청: 8행 기준 7행의 자료가 없으면 전 컬럼의 7행 사용)
+                            const parentRow = data[h2Idx - 1] || [];
+                            const categoryMap = new Array(foundHeader2.length).fill("");
+                            let lastValue = "";
+
+                            for (let c = 0; c < foundHeader2.length; c++) {
+                                const cell = String(parentRow[c] || "").trim();
+                                if (cell !== "") {
+                                    lastValue = cell;
                                 }
+                                categoryMap[c] = lastValue;
                             }
 
-                            foundHeader1 = data[h1Idx] || [];
+                            foundHeader1 = categoryMap; // 확정된 카테고리 맵 사용
                             foundHeader2 = data[h2Idx] || [];
                             break;
                         }
@@ -800,24 +801,14 @@
                 }
 
                 // 3. 테이블 생성 (세로형)
-                let tableHTML = `<table class="min-w-full border-collapse border border-gray-200">
+                let tableHTML = `<table class="min-w-full border-collapse border border-gray-200 shadow-sm">
                     <thead class="bg-gray-100">
                         <tr>
-                            <th class="border border-gray-300 p-2 w-1/3 text-sm text-gray-600">구분 (항목)</th>
-                            <th class="border border-gray-300 p-2 text-sm text-gray-600">상세 규격 내용</th>
+                            <th class="border border-gray-300 p-2 w-1/3 text-xs text-gray-500 uppercase tracking-wider">구분 (항목)</th>
+                            <th class="border border-gray-300 p-2 text-xs text-gray-500 uppercase tracking-wider">상세 규격 내용</th>
                         </tr>
                     </thead>
                     <tbody>`;
-
-                // 병합된 부모 헤더 처리를 위한 forward-fill (빈 칸은 왼쪽 값으로 채움)
-                let currentParent = "";
-                const filledHeader1 = (foundHeader1 || []).map(h => {
-                    const trimmed = String(h || "").trim();
-                    if (trimmed !== "") {
-                        currentParent = trimmed;
-                    }
-                    return currentParent;
-                });
 
                 let lastDisplayedParent = "";
                 foundHeader2.forEach((h, idx) => {
@@ -828,13 +819,13 @@
                     if (headerText.replace(/\s/g, "").includes("물품식별번호")) return;
 
                     const val = foundData[idx] || '-';
-                    const parent = filledHeader1[idx] || '';
+                    const parent = foundHeader1[idx] || '';
 
-                    // 카테고리가 달라지면 카테고리 구분 행 추가 (최초 1회 포함)
+                    // 카테고리가 존재하고 이전과 달라지면 파란색 구분 행 추가
                     if (parent && parent !== lastDisplayedParent) {
                         tableHTML += `
                             <tr>
-                                <td colspan="2" class="bg-blue-50 p-2 text-blue-700 font-bold text-xs border border-gray-300">
+                                <td colspan="2" class="bg-blue-600 p-2 text-white font-bold text-sm border border-blue-700 text-center uppercase">
                                     ${parent}
                                 </td>
                             </tr>`;
@@ -843,10 +834,10 @@
 
                     tableHTML += `
                         <tr>
-                            <td class="border border-gray-300 p-2 bg-gray-50 font-medium text-gray-600">
+                            <td class="border border-gray-300 p-2 bg-gray-50 font-semibold text-gray-700 text-sm">
                                 ${headerText}
                             </td>
-                            <td class="border border-gray-300 p-2 text-gray-800">
+                            <td class="border border-gray-300 p-2 text-gray-800 text-sm">
                                 ${val}
                             </td>
                         </tr>`;
