@@ -739,27 +739,44 @@
                 let tableHTML = `<table class="min-w-full border-collapse border border-gray-200">
                     <thead class="bg-gray-100">
                         <tr>
-                            <th class="border border-gray-300 p-2 w-1/3">구분 (항목)</th>
-                            <th class="border border-gray-300 p-2">상세 규격 내용</th>
+                            <th class="border border-gray-300 p-2 w-1/3 text-sm">구분 (항목)</th>
+                            <th class="border border-gray-300 p-2 text-sm">상세 규격 내용</th>
                         </tr>
                     </thead>
                     <tbody>`;
 
+                // 병합된 부모 헤더 처리를 위한 forward-fill (빈 칸은 왼쪽 값으로 채움)
+                let currentParent = "";
+                const filledHeader1 = (foundHeader1 || []).map(h => {
+                    const trimmed = String(h || "").trim();
+                    if (trimmed !== "") {
+                        currentParent = trimmed;
+                    }
+                    return currentParent;
+                });
+
                 foundHeader2.forEach((h, idx) => {
                     if (!h) return;
 
+                    const headerText = String(h).trim();
                     // "물품 식별번호" 행 삭제
-                    if (String(h).replace(/\s/g, "").includes("물품식별번호")) return;
+                    if (headerText.replace(/\s/g, "").includes("물품식별번호")) return;
 
                     const val = foundData[idx] || '-';
-                    const parentHeader = foundHeader1[idx] ? `<span class="text-xs text-gray-400 block">${foundHeader1[idx]}</span>` : '';
+                    const parent = filledHeader1[idx] || '';
+
+                    // 부모 헤더가 존재하고 자식 헤더와 다를 때만 표시
+                    const displayParent = (parent && parent !== headerText)
+                        ? `<div class="text-[10px] text-blue-600 font-bold mb-0.5 opacity-70">[${parent}]</div>`
+                        : '';
 
                     tableHTML += `
                         <tr>
-                            <td class="border border-gray-300 p-2 bg-gray-50 font-medium">
-                                ${parentHeader}${h}
+                            <td class="border border-gray-300 p-2 bg-gray-50">
+                                ${displayParent}
+                                <div class="font-medium text-gray-700">${headerText}</div>
                             </td>
-                            <td class="border border-gray-300 p-2">
+                            <td class="border border-gray-300 p-2 text-gray-800">
                                 ${val}
                             </td>
                         </tr>`;
