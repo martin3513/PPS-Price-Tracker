@@ -803,7 +803,7 @@
                 }
 
                 if (!foundData) {
-                    throw new Error(`모든 시트(${desktopWorkbook.SheetNames.join(", ")})를 검색했으나 식별번호(${id})를 찾을 수 없습니다.`);
+                    throw new Error("자료 없음");
                 }
 
                 // 3. 테이블 생성 (세로형)
