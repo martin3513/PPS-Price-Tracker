@@ -826,6 +826,7 @@
 
                     const val = foundData[idx] || '-';
                     const parent = foundHeader1[idx] || '';
+                    const displayHeaderText = parent ? `[${parent}] ${headerText}` : headerText;
 
                     // 카테고리 구분 행 (UI 전문가 스타일: 소프트 블루 배경 + 굵은 중앙 정렬)
                     if (parent && parent !== lastDisplayedParent) {
@@ -843,7 +844,7 @@
                     tableHTML += `
                         <tr class="hover:bg-gray-50/80 transition-colors">
                             <td class="border border-gray-300 p-2.5 bg-gray-50/50 font-bold text-gray-700 text-[12px]">
-                                ${headerText}
+                                ${displayHeaderText}
                             </td>
                             <td class="border border-gray-300 p-2.5 text-gray-800 text-[13px] leading-relaxed">
                                 ${val}
