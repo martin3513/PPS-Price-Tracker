@@ -776,20 +776,27 @@
                             foundData = targetRow;
                             foundSheetName = sheetName;
 
-                            // 2.2 부모 카테고리 정보 추출 (사용자 요청: 8행 기준 7행의 자료가 없으면 전 컬럼의 7행 사용)
-                            const parentRow = data[h2Idx - 1] || [];
+                            // 2.2 부모 카테고리 정보 추출 (다중 행 스캔 + 사용자 요청 Forward-fill)
                             const categoryMap = new Array(foundHeader2.length).fill("");
-                            let lastValue = "";
 
-                            for (let c = 0; c < foundHeader2.length; c++) {
-                                const cell = String(parentRow[c] || "").trim();
-                                if (cell !== "") {
-                                    lastValue = cell;
+                            // 헤더(h2Idx) 위의 모든 행을 대상으로 유효한 카테고리명 추출
+                            // 위에서 아래로 행을 훑으며, 각 열에 대해 마지막으로 발견된 유효한 텍스트를 카테고리로 취합
+                            for (let r = 0; r < h2Idx; r++) {
+                                const currentRow = data[r] || [];
+                                let lastValueInRow = "";
+                                for (let c = 0; c < foundHeader2.length; c++) {
+                                    const cellValue = String(currentRow[c] || "").trim();
+                                    if (cellValue !== "") {
+                                        lastValueInRow = cellValue;
+                                    }
+                                    // 유의미한 텍스트(규격, 물품명 제외)가 있으면 업데이트
+                                    if (lastValueInRow !== "" && !["", "규격", "규격명", "물품명"].includes(lastValueInRow)) {
+                                        categoryMap[c] = lastValueInRow;
+                                    }
                                 }
-                                categoryMap[c] = lastValue;
                             }
 
-                            foundHeader1 = categoryMap; // 확정된 카테고리 맵 사용
+                            foundHeader1 = categoryMap; // 확정된 다중행 카테고리 맵 사용
                             foundHeader2 = data[h2Idx] || [];
                             break;
                         }
@@ -801,11 +808,11 @@
                 }
 
                 // 3. 테이블 생성 (세로형)
-                let tableHTML = `<table class="min-w-full border-collapse border border-gray-200 shadow-sm">
+                let tableHTML = `<table class="min-w-full border-collapse border border-gray-200 shadow-sm rounded-lg overflow-hidden">
                     <thead class="bg-gray-100">
                         <tr>
-                            <th class="border border-gray-300 p-2 w-1/3 text-xs text-gray-500 uppercase tracking-wider">구분 (항목)</th>
-                            <th class="border border-gray-300 p-2 text-xs text-gray-500 uppercase tracking-wider">상세 규격 내용</th>
+                            <th class="border border-gray-300 p-2.5 w-1/3 text-xs font-bold text-gray-600 tracking-wider">항목 (구분)</th>
+                            <th class="border border-gray-300 p-2.5 text-xs font-bold text-gray-600 tracking-wider">상세 사양</th>
                         </tr>
                     </thead>
                     <tbody>`;
@@ -815,29 +822,30 @@
                     if (!h) return;
 
                     const headerText = String(h).trim();
-                    // "물품 식별번호" 행 삭제
                     if (headerText.replace(/\s/g, "").includes("물품식별번호")) return;
 
                     const val = foundData[idx] || '-';
                     const parent = foundHeader1[idx] || '';
 
-                    // 카테고리가 존재하고 이전과 달라지면 파란색 구분 행 추가
+                    // 카테고리 구분 행 (UI 전문가 스타일: 소프트 블루 배경 + 굵은 중앙 정렬)
                     if (parent && parent !== lastDisplayedParent) {
                         tableHTML += `
-                            <tr>
-                                <td colspan="2" class="bg-blue-600 p-2 text-white font-bold text-sm border border-blue-700 text-center uppercase">
-                                    ${parent}
+                            <tr class="bg-blue-50/70">
+                                <td colspan="2" class="p-2.5 text-center border border-gray-200">
+                                    <span class="text-blue-800 font-extrabold text-[13px] tracking-tight whitespace-nowrap">
+                                        [ ${parent} ]
+                                    </span>
                                 </td>
                             </tr>`;
                         lastDisplayedParent = parent;
                     }
 
                     tableHTML += `
-                        <tr>
-                            <td class="border border-gray-300 p-2 bg-gray-50 font-semibold text-gray-700 text-sm">
+                        <tr class="hover:bg-gray-50/80 transition-colors">
+                            <td class="border border-gray-300 p-2.5 bg-gray-50/50 font-bold text-gray-700 text-[12px]">
                                 ${headerText}
                             </td>
-                            <td class="border border-gray-300 p-2 text-gray-800 text-sm">
+                            <td class="border border-gray-300 p-2.5 text-gray-800 text-[13px] leading-relaxed">
                                 ${val}
                             </td>
                         </tr>`;
