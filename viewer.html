@@ -699,24 +699,34 @@
                     const sheet = desktopWorkbook.Sheets[sheetName];
                     const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-                    if (data.length < 8) continue; // 최소 제목행까지는 있어야 함
+                    if (data.length < 5) continue;
 
-                    const header2 = data[7] || [];
-                    const idColIndex = header2.findIndex(h => String(h).includes("물품 식별번호"));
+                    // 2.1 "물품 식별번호" 컬럼 동적 찾기 (상단 150행 이내)
+                    let idColIndex = -1;
+                    let h2Idx = -1;
+                    for (let r = 0; r < Math.min(data.length, 150); r++) {
+                        const row = data[r] || [];
+                        const foundIdx = row.findIndex(h => String(h || "").replace(/\s/g, "").includes("물품식별번호"));
+                        if (foundIdx !== -1) {
+                            idColIndex = foundIdx;
+                            h2Idx = r;
+                            break;
+                        }
+                    }
 
                     if (idColIndex !== -1) {
+                        const searchId = String(id).trim().replace(/,/g, "");
                         const targetRow = data.find(row => {
-                            const cellValue = String(row[idColIndex] || "").trim();
-                            const searchId = String(id).trim();
+                            const cellValue = String(row[idColIndex] || "").trim().replace(/,/g, "");
                             return cellValue === searchId;
                         });
 
                         if (targetRow) {
                             foundData = targetRow;
                             foundSheetName = sheetName;
-                            foundHeader1 = data[6] || [];
-                            foundHeader2 = header2;
-                            break; // 데이터 찾으면 중단
+                            foundHeader1 = data[h2Idx - 1] || [];
+                            foundHeader2 = data[h2Idx] || [];
+                            break;
                         }
                     }
                 }
